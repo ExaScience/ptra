@@ -143,7 +143,8 @@ const ptraHelp = "\nptra parameters:\n" +
 	"NMIBC | MIBC | mUC ]\n" +
 	"[--tumorInfo file]\n" +
 	"[--tfilters neoplasm | bc]\n" +
-	"[--treatmentInfo file]\n"
+	"[--treatmentInfo file]\n" +
+	"[--nrOfThreads nr]\n"
 
 func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
 	if len(os.Args) < requiredArgs {
@@ -286,12 +287,14 @@ func main() {
 		tfilters             string
 		tumorInfo            string
 		treatmentInfo        string
+		nrOfThreads          int
 	)
 	var flags flag.FlagSet
 	// options for the ptra command
 	flags.IntVar(&nofAgeGroups, "nofAgeGroups", 6, "The population data is divided in cohorts in"+
 		"terms of age groups to calculate relative risk ratios of diagnosis pairs. This parameters configures how"+
 		"many age groups to use")
+	flags.IntVar(&nrOfThreads, "nrOfThreads", 0, "The number of threads ptra uses.")
 	flags.IntVar(&lvl, "lvl", 3, "Diagnosis codes are organised in a hierarchy of diagnosis "+
 		"descriptors. The level says which descriptor in the hiearchy to use for trajectory building.")
 	flags.Float64Var(&maxYears, "maxYears", 5.0, "The maximum number of years between diagnosis "+
@@ -369,10 +372,13 @@ func main() {
 	}
 	fmt.Fprint(&command, " --pfilters ", pfilters)
 	fmt.Fprint(&command, " --tfilters ", tfilters)
+	if nrOfThreads > 0 {
+		runtime.GOMAXPROCS(nrOfThreads)
+		fmt.Fprint(&command, " --nrOfThreads ", nrOfThreads)
+	}
 	// start execution
 	log.Println(programMessage())
 	log.Println("Executing command:\n", command.String())
-
 	//1. Parse inputs into experiment
 	// Parse Tumor info
 	tinfo := map[string][]*app.TumorInfo{} // filterInfo is a variable to pass around filter-specific information. E.g. parsed tumor data for the tumor stage filter.
