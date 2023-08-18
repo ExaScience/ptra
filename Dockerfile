@@ -6,6 +6,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . ./
+COPY .docker/entrypoint.sh start.sh
 
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /ptra
@@ -15,12 +16,12 @@ FROM build-stage AS run-test-stage
 RUN go test -v ./...
 
 # Deploy the application binary into a lean image
-FROM gcr.io/distroless/base-debian11 AS build-release-stage
+FROM alpine AS build-release-stage
 
 WORKDIR /
 
+COPY .docker/entrypoint.sh .
 COPY --from=build-stage /ptra /ptra
+RUN chmod +x entrypoint.sh
 
-USER nonroot:nonroot
-
-ENTRYPOINT ["/ptra"]
+CMD ["./entrypoint.sh"]
