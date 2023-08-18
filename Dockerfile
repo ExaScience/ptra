@@ -25,4 +25,7 @@ COPY .docker/entrypoint.sh .
 COPY --from=build-stage /ptra /ptra
 RUN chmod +x entrypoint.sh
 
+RUN adduser -g 100 -u 1000 -D nonroot
+USER nonroot
+
 CMD ["./entrypoint.sh"]

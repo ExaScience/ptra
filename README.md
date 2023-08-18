@@ -285,6 +285,8 @@ This command assumes that the input files (see "Command Line Interface Reference
 * `diagnosis.csv`
 * `physicianInfoFile.xml` or `physicianInfoFile.csv`
 
+WARNING: This command will trigger the CLI and store all generated files in the mounted `.output` folder. Make sure that the `.output` folder is created by a non-root user, preferably a user with UID=1000 AND GUID=100. If you notice that the CLI could not successfully complete because of a "Permission denied" error.
+
 ### Environment variables 
 
 By providing environment variables you can change the CLI parameters.
