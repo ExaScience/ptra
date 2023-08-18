@@ -7,7 +7,8 @@
 4. Dependencies
 5. Building
 6. Command Reference (CLI)
-7. Implementation Manual (APIs)
+7. Docker
+8. Implementation Manual (APIs)
 
 # 1. Description
 
@@ -262,7 +263,69 @@ bladder cancer.
 A file with information about patients and their treatments, e.g. MVAC,radical cystectomy, etc. If this file is
 passed, the treatments will be used as diagnostic codes to calculated trajectories.
 
-# 7. Implementation Manual (APIs)
+# 7. Docker
+
+A Dockerfile is available for `ptra`. 
+Building the docker image requires a working installation of Docker. Please check the documentation of your OS.
+
+## Building the docker image
+
+The docker image can be built with the following command:
+
+```docker build -t ptra:latest .```
+
+## Running the docker image
+
+The docker image can be run with the following command:
+
+```docker run -v $(pwd)/.input:/input -v $(pwd)/.output:/output ptra:latest```
+
+This command assumes that the input files (see "Command Line Interface Reference" paragraph) are located in the .input folder and are named:
+* `patients.csv`
+* `diagnosis.csv`
+* `physicianInfoFile.xml` or `physicianInfoFile.csv`
+
+### Environment variables 
+
+By providing environment variables you can change the CLI parameters.
+The env variables correspond to the CLI parameters and flags. All env variables are optional.
+
+
+| ENV                   | cli param/flag      | Description                                                                                         | Default                             |
+|-----------------------|---------------------|-----------------------------------------------------------------------------------------------------|-------------------------------------|
+| PATIENT_FILE          | patientInfoFile     | Name of file containing patient data                                                                | patients.csv                        |
+| DIAGNOSIS_INFO_FILE   | diagnosisInfoFile   | Name of the file containing mapping diagnosis IDs (ICD10) used in TriNetX onto medical descriptions | diagnosisInfo.xml/diagnosisInfo.csv |
+| DIAGNOSES_FILE        | diagnosesFile       | Name of the file containing dated diagnoses for patients exported from TriNetX.                     | diagnoses.csv                       |
+| NUMBER_OF_AGE_GROUPS  | nofAgeGroups        |                                                                                                     |                                     |
+| LEVEL                 | lvl                 |                                                                                                     |                                     |
+| MIN_PATIENTS          | minPatients         |                                                                                                     |                                     |
+| MAX_YEARS             | maxYears            |                                                                                                     |                                     |
+| MIN_YEARS             | minYears            |                                                                                                     |                                     |
+| MAX_TRAJECTORY_LENGTH | maxTrajectoryLength |                                                                                                     |                                     |
+| MIN_TRAJECTORY_LENGTH | minTrajectoryLength |                                                                                                     |                                     |
+| NAME                  | name                |                                                                                                     |                                     |
+| ICD9_TO_ICD10_FILE    | ICD9ToICD10File     |                                                                                                     |                                     |
+| CLUSTER               | cluster             |                                                                                                     |                                     |
+| MCL_PATH              | mclPath             |                                                                                                     |                                     |
+| ITER                  | iter                |                                                                                                     |                                     |
+| SAVE_RR               | saveRR              |                                                                                                     |                                     |
+| LOAD_RR               | loadRR              |                                                                                                     |                                     |
+| PFILTERS              | pfilters            |                                                                                                     |                                     |
+| TUMOR_INFO            | tumorInfo           |                                                                                                     |                                     |
+| TFILTERS              | tfilters            |                                                                                                     |                                     |
+| TREATMENT_INFO        | treatmentInfo       |                                                                                                     |                                     |
+
+
+An example:
+
+```bash
+docker run -v $(pwd)/.input:/input -v $(pwd)/.output:/output -e DIAGNOSIS_INFO_FILE=di.xml -e NUMBER_OF_AGE_GROUPS=20 PATIENT_FILE=p.csv -e ptra:latest
+```
+indicates that the diagnosis file is named di.xml and the patient file is named p.csv.  The number of age groups will be 20.
+
+TIP: use the --env-file docker cli flag instead of specifying all the env variables in the command.  
+
+# 8. Implementation Manual (APIs)
 
 The Patient Trajectory Analysis library is organised as a framework to allow easy reuse of its code, for example to 
 implement trajectory analysis of new medical event data sets.

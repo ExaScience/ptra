@@ -19,6 +19,7 @@ RUN go test -v ./...
 FROM alpine AS build-release-stage
 
 WORKDIR /
+RUN mkdir -p /input /output
 
 COPY .docker/entrypoint.sh .
 COPY --from=build-stage /ptra /ptra
