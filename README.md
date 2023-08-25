@@ -165,7 +165,7 @@ The `ptra` command requires four arguments:
   
        Example:
 
-       ![imgage_cluster.png](imgage_cluster.png)
+       ![image_cluster.png](image_cluster.png)
 
 ### Optional flags
 
