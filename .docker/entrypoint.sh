@@ -89,7 +89,7 @@ else
     input_dir="/input/"
 fi
 
-iso8601_datetime=$(date -u +"%Y%m%dT%H:%M:%SZ")
+iso8601_datetime=$(date -u +"%Y%m%dT%H%M%SZ")
 output_dir="$output_dir/$iso8601_datetime"
 
 echo "Using input: $input_dir"
