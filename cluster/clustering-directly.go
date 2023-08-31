@@ -46,6 +46,32 @@ func jaccardTrajectory(t1, t2 *trajectory.Trajectory) float64 {
 	return float64(n) / (float64(nt1) + float64(nt2) - float64(n))
 }
 
+// SzymkiewiczSimpsonTrajectory computes the Szymkiewicz-Simpson similarity coefficient for two given trajectories.
+func SzymkiewiczSimpsonTrajectory(t1, t2 *trajectory.Trajectory) float64 {
+	n := 0
+	for _, d1 := range t1.Diagnoses {
+		if utils.MemberInt(d1, t2.Diagnoses) {
+			n++
+		}
+	}
+	nt1 := len(t1.Diagnoses)
+	nt2 := len(t2.Diagnoses)
+	return float64(n) / float64(utils.MinInt(nt1, nt2))
+}
+
+// SorensenDiceTrajectory computes the SorensenDice similarity coefficient for two given trajectories.
+func SorensenDiceTrajectory(t1, t2 *trajectory.Trajectory) float64 {
+	n := 0
+	for _, d1 := range t1.Diagnoses {
+		if utils.MemberInt(d1, t2.Diagnoses) {
+			n++
+		}
+	}
+	nt1 := len(t1.Diagnoses)
+	nt2 := len(t2.Diagnoses)
+	return float64(2*n) / (float64(nt1 + nt2))
+}
+
 // convertTrajectoriesToAbcFormat compute the jaccard between each trajectory and writes out the result to file.
 // Streaming algorithm to avoid pressure on memory.
 func convertTrajectoriesToAbcFormat(exp *trajectory.Experiment, name string) {
