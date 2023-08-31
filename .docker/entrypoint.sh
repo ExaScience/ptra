@@ -76,4 +76,24 @@ FLAGS=$(echo "$FLAGS" | sed 's/ *$//g')
 echo "*$FLAGS*"
 cd ..
 
-./ptra /input/"$PATIENT_FILE" /input/"$DIAGNOSIS_INFO_FILE" /input/"$DIAGNOSES_FILE" /output/ $FLAGS
+# Input and output folder
+if [ -n "$OUTPUT_FOLDER" ]; then
+    echo "Using output: $OUTPUT_FOLDER"
+    output_dir="$OUTPUT_FOLDER"
+else
+    output_dir="/output/"
+fi
+if [ -n "$INPUT_FOLDER" ]; then
+    input_dir="$INPUT_FOLDER"
+else
+    input_dir="/input/"
+fi
+
+iso8601_datetime=$(date -u +"%Y%m%dT%H:%M:%SZ")
+output_dir="$output_dir/$iso8601_datetime"
+
+echo "Using input: $input_dir"
+echo "Using output: $output_dir"
+
+
+./ptra "$input_dir""$PATIENT_FILE" "$input_dir""$DIAGNOSIS_INFO_FILE" "$input_dir""$DIAGNOSES_FILE" "$output_dir" $FLAGS
