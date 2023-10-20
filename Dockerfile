@@ -15,7 +15,7 @@ FROM build-stage AS run-test-stage
 RUN go test -v ./...
 
 # Deploy the application binary into a lean image
-FROM debian AS build-release-stage
+FROM debian:stable-slim AS build-release-stage
 
 # Install mcl package for clustering
 # ref. https://debian.pkgs.org/11/debian-main-amd64/mcl_14-137+ds-9+b1_amd64.deb.html
