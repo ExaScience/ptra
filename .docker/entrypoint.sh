@@ -1,6 +1,6 @@
 #!/bin/sh
 
-## Look for the patient file
+# Look for the patient file
 cd input || exit
 
 # Determine patient file
@@ -44,7 +44,7 @@ else
   exit 1
 fi
 
-# Adding flags
+# Add flags
 FLAGS=""
 addFlag() {
   if [ -n "$1" ]; then
@@ -70,9 +70,13 @@ addFlag "$PFILTERS" "pfilters"
 addFlag "$TUMOR_INFO" "tumorInfo"
 addFlag "$TFILTERS" "tfilters"
 addFlag "$TREATMENT_INFO" "treatmentInfo"
+addFlag "$CLUSTER_GRANULARITIES" "clusterGranularities"
+addFlag "$NUMBER_OF_THREADS" "nrOfThreads"
+addFlag "$RR" "RR"
 
-#trim the flags
+# Trim the flags
 FLAGS=$(echo "$FLAGS" | sed 's/ *$//g')
+FLAGS=$(echo "$FLAGS" | sed 's/--cluster 1/--cluster/g') # "--cluster" is a flag without parameter: to enable it, set it to "1"
 echo "*$FLAGS*"
 cd ..
 
@@ -94,6 +98,5 @@ output_dir="$output_dir/$iso8601_datetime"
 
 echo "Using input: $input_dir"
 echo "Using output: $output_dir"
-
 
 ./ptra "$input_dir""$PATIENT_FILE" "$input_dir""$DIAGNOSIS_INFO_FILE" "$input_dir""$DIAGNOSES_FILE" "$output_dir" $FLAGS

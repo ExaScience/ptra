@@ -313,7 +313,7 @@ func main() {
 		"ICD10 codes.")
 	flags.BoolVar(&clust, "cluster", false, "Cluster the trajectories using MCL and output "+
 		"the results")
-	flags.StringVar(&mclPath, "mclPath", "/usr/bin/mcl", "The path to the mcl binary.")
+	flags.StringVar(&mclPath, "mclPath", "", "The path to the mcl binary.")
 	flags.StringVar(&clusterGranularities, "clusterGranularities", "40,60,80,100", "The "+
 		"granularities used for the mcl clustering step.") // recommended 14,20,40,60
 	flags.IntVar(&iter, "iter", 10000, "The minimum number of sampling iterations "+
