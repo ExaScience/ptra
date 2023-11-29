@@ -4,11 +4,12 @@
 1. Description
 2. Licensing
 3. Availability
-4. Dependencies
-5. Building
-6. Command Reference (CLI)
-7. Docker
-8. Implementation Manual (APIs)
+4. Citing ptra
+5. Dependencies
+6. Building
+7. Command Reference (CLI)
+8. Docker
+9. Implementation Manual (APIs)
 
 # 1. Description
 
@@ -74,13 +75,19 @@ The `ptra` source code is freely available on GitHub. `ptra` is implemented in G
 
 * https://github.com/exascience/ptra
 
-# 4. Dependencies
+# 4. Citing ptra
+
+Please cite the following article:
+
+Herzeel C, D'Hondt E, Vandeweerd V, Botermans W, Akand M, Van der Aa F, Wuyts R, Verachtert W. A software package for efficient patient trajectory analysis applied to analyzing bladder cancer development. PLOS Digit Health. 2023 Nov 22;2(11):e0000384. doi: 10.1371/journal.pdig.0000384.
+
+# 5. Dependencies
 
 `ptra` uses the `fastrand` library.
 
 The clustering is by default done via the [MCL](https://micans.org/mcl/) tool.
 
-# 5. Building
+# 6. Building
 
 The following information is relevant if you want to build `ptra` to obtain an executable. `ptra` out of the box implements 
 one use case (TriNetX), and building an executable hence by default generates a binary for this use case. For 
@@ -102,7 +109,7 @@ Add the binary to your path, for example:
 
     export PATH=$PATH:~/go/bin
 
-# 6. Command Line Interface Reference (CLI)
+# 7. Command Line Interface Reference (CLI)
 ## TriNetX Use Case
 ### Name
 `ptra` - a commandline tool for extracting statistically relevant trajectories from ICD9/ICD10 diagnosis histories in 
@@ -263,7 +270,7 @@ bladder cancer.
 A file with information about patients and their treatments, e.g. MVAC,radical cystectomy, etc. If this file is
 passed, the treatments will be used as diagnostic codes to calculated trajectories.
 
-# 7. Docker
+# 8. Docker
 
 A Dockerfile is available for `ptra`. 
 Building the docker image requires a working installation of Docker. Please check the documentation of your OS.
@@ -333,7 +340,7 @@ indicates that the diagnosis file is named di.xml and the patient file is named 
 
 TIP: use the --env-file docker cli flag instead of specifying all the env variables in the command.  
 
-# 8. Implementation Manual (APIs)
+# 9. Implementation Manual (APIs)
 
 The Patient Trajectory Analysis library is organised as a framework to allow easy reuse of its code, for example to 
 implement trajectory analysis of new medical event data sets.
