@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 )
@@ -65,7 +66,8 @@ func Run(args *ExperimentParams) (err error) {
 		// converts any panics into errors to avoid crashing the app
 		if r := recover(); r != nil {
 			fmt.Println("Recovered from panic during experiment: ", r)
-			err = errors.New(fmt.Sprintf("failed to run experiment: %v", r))
+			err = errors.New(fmt.Sprintf("%v", r))
+			fmt.Println(string(debug.Stack()))
 		}
 	}()
 
