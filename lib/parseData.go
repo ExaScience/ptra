@@ -256,27 +256,27 @@ func initializeIcd10NameMap(file string) map[string]Icd10Entry {
 // the ICD10 category description (string) onto a boolean.
 func getIcd10DescToExcludeFromAnalysis() map[string]bool {
 	exclude := map[string]bool{}
-	exclude["Pregnancy, childbirth and the puerperal (O00-O9A)"] = true
-	exclude["Certain conditions originating in the perinatal period (P00-P96)"] = true
-	exclude["Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified (R00-R99)"] = true
-	exclude["Injury, poisoning and certain other consequences of external causes (S00-T88)"] = true
-	exclude["External causes of morbidity (V00-Y99)"] = true
-	exclude["Factors influencing health status and contact with health services (Z00-Z99)"] = true
+	//exclude["Pregnancy, childbirth and the puerperal (O00-O9A)"] = true
+	//exclude["Certain conditions originating in the perinatal period (P00-P96)"] = true
+	//exclude["Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified (R00-R99)"] = true
+	//exclude["Injury, poisoning and certain other consequences of external causes (S00-T88)"] = true
+	//exclude["External causes of morbidity (V00-Y99)"] = true
+	//exclude["Factors influencing health status and contact with health services (Z00-Z99)"] = true
 	return exclude
 }
 
 // getIcd10CodesToExcludeFromAnalysis returns the first letters of ICD10 codes to exclude from analysis.
 func getIcd10CodesToExcludeFromAnalysis() map[string]bool {
 	exclude := map[string]bool{}
-	exclude["O"] = true
-	exclude["P"] = true
-	exclude["R"] = true
-	exclude["S"] = true
-	exclude["T"] = true
-	exclude["V"] = true
-	exclude["X"] = true
-	exclude["Y"] = true
-	exclude["Z"] = true
+	//exclude["O"] = true
+	//exclude["P"] = true
+	//exclude["R"] = true
+	//exclude["S"] = true
+	//exclude["T"] = true
+	//exclude["V"] = true
+	//exclude["X"] = true
+	//exclude["Y"] = true
+	//exclude["Z"] = true
 	return exclude
 }
 
@@ -323,13 +323,13 @@ func initializeIcd10AnalysisMaps(icd10Map map[string]Icd10Entry, level int) (map
 		}
 		analysisIdMap[icd10Code] = newID
 	}
-	extra := getNonICD10CodesToAddToAnalysis()
-	for code, name := range extra {
-		analysisIcd10Map[ctr] = Icd10Entry{Name: name}
-		nameToAnalysisIdMap[name] = ctr
-		analysisIdMap[code] = ctr
-		ctr++
-	}
+	//extra := getNonICD10CodesToAddToAnalysis()
+	//for code, name := range extra {
+	//	analysisIcd10Map[ctr] = Icd10Entry{Name: name}
+	//	nameToAnalysisIdMap[name] = ctr
+	//	analysisIdMap[code] = ctr
+	//	ctr++
+	//}
 	fmt.Println("Mapped ", len(icd10Map), " ICD10 codes to ", ctr, " analysis IDs of Level ", level)
 	return analysisIdMap, analysisIcd10Map, ctr
 }
@@ -446,12 +446,12 @@ func initializeIcd10AnalysisMapsCCSR(icd10ToCssrMap map[string]ccsrCategory) (ma
 		}
 		analysisIdMap[icd10Code] = ids
 	}
-	extra := getNonICD10CodesToAddToAnalysis()
-	for code, name := range extra {
-		analysisIcd10Map[ctr] = Icd10Entry{Name: name}
-		analysisIdMap[code] = []int{ctr}
-		ctr++
-	}
+	//extra := getNonICD10CodesToAddToAnalysis()
+	//for code, name := range extra {
+	//	analysisIcd10Map[ctr] = Icd10Entry{Name: name}
+	//	analysisIdMap[code] = []int{ctr}
+	//	ctr++
+	//}
 	fmt.Println("Mapped ", len(icd10ToCssrMap), " ICD10 codes to ", ctr, " analysis IDs")
 	return analysisIdMap, analysisIcd10Map, ctr
 }
@@ -755,12 +755,12 @@ func parseTriNetXDiagnosisDate(date string) DiagnosisDate {
 
 // TriNetXEventOfInterest checks if the ICD10 code is related to bladder cancer
 func TriNetXEventOfInterest(icd10ID string) bool {
-	if icd10ID == "Z85.1" {
+	if icd10ID == "G1" {
 		return true
 	}
-	if len(icd10ID) >= 3 && icd10ID[0:3] == "C67" {
-		return true
-	}
+	//if len(icd10ID) >= 3 && icd10ID[0:3] == "C67" {
+	//	return true
+	//}
 	return false
 }
 

@@ -518,7 +518,7 @@ func (exp *Experiment) InitRR(minTime, maxTime float64, iter int) {
 							d := float64(len(d1ExposedPatients) - d2CtrInNotExposedGroup) //take len(d1ExposedPatients) cause we want same length randomly selected groups
 							p1 := a / (a + b)
 							p2 := c / (c + d)
-							RR := p1 / p2
+							RR := math.Min(p1/p2, 1000)
 							// initialize RR, d1->d2 ctrs etc
 							exp.DxDRR[d1][d2] = RR
 							exp.DxDPatients[d1][d2] = d1FollowedByd2Patients
@@ -726,19 +726,11 @@ func (exp *Experiment) selectDiagnosisPairs(minPatients int, minRR float64) []*P
 			RRReverse := exp.DxDRR[j][i]
 			if i != j {
 				if occurs >= minPatients && RR > minRR && occursReverse >= minPatients && RRReverse > minRR {
-					var maxOccurs int
-					var maxIndices *Pair
-					if occurs > occursReverse {
-						maxOccurs = occurs
-						maxIndices = &Pair{First: i, Second: j}
-					} else {
-						maxOccurs = occursReverse
-						maxIndices = &Pair{First: j, Second: i}
-					}
-					test := utils.BinomialCdf(0.5, occurs+occursReverse, maxOccurs)
-					if test < 0.05 {
-						pairs = append(pairs, maxIndices)
-					}
+					pairs = append(
+						pairs,
+						&Pair{First: i, Second: j},
+						&Pair{First: j, Second: i},
+					)
 					continue
 				}
 				if occurs >= minPatients && RR > minRR {
