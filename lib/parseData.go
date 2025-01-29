@@ -301,23 +301,23 @@ func initializeIcd10AnalysisMaps(icd10Map map[string]Icd10Entry, level int) (map
 	nameToAnalysisIdMap := map[string]int{}               // maps medical Name to analysis ID
 	ctr := 0                                              //serves as analysis ID generator
 	icd10ToExclude := getIcd10DescToExcludeFromAnalysis() // a list of Level 0 Categories to exclude from analysis
-	for icd10Code, icd10 := range icd10Map {
-		if _, ok := icd10ToExclude[icd10.Categories[0]]; ok {
+	for icd10Code, icd10Entry := range icd10Map {
+		if _, ok := icd10ToExclude[icd10Entry.Categories[0]]; ok {
 			// code to exclude from analysis
 			continue
 		}
 		var name string
-		if level >= icd10.Level {
-			name = icd10.Name
+		if level >= icd10Entry.Level {
+			name = icd10Entry.Name
 		} else {
-			name = icd10.Categories[level]
+			name = icd10Entry.Categories[level]
 		}
 		// may already have seen Name, because of Level
 		newID, ok := nameToAnalysisIdMap[name]
 		if !ok {
 			newID = ctr
 			ctr++
-			analysisIcd10Map[newID] = icd10
+			analysisIcd10Map[newID] = icd10Entry
 			nameToAnalysisIdMap[name] = newID
 		}
 		analysisIdMap[icd10Code] = newID
@@ -467,8 +467,8 @@ type icd10AnalysisMapsFromXML struct {
 	DIDMap            map[string]int     // map ICD10 Code -> DID
 }
 
-func (analysisMap icd10AnalysisMapsFromXML) getDID(icd10DID string) int {
-	if v, ok := analysisMap.DIDMap[icd10DID]; ok {
+func (analysisMap icd10AnalysisMapsFromXML) getDID(icd10Name string) int {
+	if v, ok := analysisMap.DIDMap[icd10Name]; ok {
 		return v
 	} else {
 		return -1
