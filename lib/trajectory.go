@@ -296,7 +296,7 @@ func InitCohorts(patients *PatientMap, nofAgegroups, nofRegions, nofDiagnosisCod
 		" nr of diagnosis codes: ", nofDiagnosisCodes, "nr of age groups: ", nofAgegroups)
 	fmt.Println("Making cohort vectors...")
 	cohorts := makeCohorts(nofAgegroups, nofRegions, nofDiagnosisCodes)
-	// count occurence of diagnoses, collect patients in the cohort
+	// count occurrence of diagnoses, collect patients in the cohort
 	fmt.Println("Counting diagnosis occurrences...")
 	for _, patient := range patients.PIDMap {
 		diagnoses := patient.Diagnoses
@@ -321,7 +321,7 @@ func InitCohorts(patients *PatientMap, nofAgegroups, nofRegions, nofDiagnosisCod
 // while avoiding patients from a list to be excluded from selection (patientsToExclude). It performs this random selection
 // without shuffling the input patients, which would be computationally too costly.
 func selectRandomPatientsWithoutShuffle(patients []*Patient, ctr int, patientsToExclude map[int]bool) []*Patient {
-	collectedPatients := []*Patient{}
+	var collectedPatients []*Patient
 	maxRandSkips := utils.MaxInt(0, len(patients)-len(patientsToExclude)-ctr)
 	for _, p := range patients {
 		if len(collectedPatients) == ctr {
@@ -356,7 +356,7 @@ func selectRandomPatientsFromSimilarCohorts(exp *Experiment, patients []*Patient
 		cohortSimilar[cohortIndex] = append(cohortSimilar[cohortIndex], p)
 	}
 	// select Random patients from the cohorts
-	collectedPatients := []*Patient{}
+	var collectedPatients []*Patient
 	for i, ps := range cohortSimilar {
 		similarPatients := selectRandomPatientsWithoutShuffle(exp.Cohorts[i].Patients, len(ps), pids)
 		for _, p := range similarPatients {
@@ -663,37 +663,47 @@ func (exp *Experiment) SaveDxDPatients(path string) {
 // MergeCohorts returns a single cohort that merges a list of input cohorts. The goal is to obtain a merged list of
 // patients, a merged patient total, and a merged disease total.
 func MergeCohorts(cohorts []*Cohort) *Cohort {
-	cohort1 := cohorts[0]
-	for _, cohort2 := range cohorts[1:] {
+	merged := cohorts[0]
+	for _, cohort := range cohorts[1:] {
 		// merge patient ctr
-		cohort1.NofPatients = cohort1.NofPatients + cohort2.NofPatients
-		cohort1.NofDiagnoses = cohort1.NofDiagnoses + cohort2.NofDiagnoses
+		merged.NofPatients = merged.NofPatients + cohort.NofPatients
+		merged.NofDiagnoses = merged.NofDiagnoses + cohort.NofDiagnoses
 		// merge DCtr
-		for i, ctr := range cohort2.DCtr {
-			cohort1.DCtr[i] = cohort1.DCtr[i] + ctr
+		for i, ctr := range cohort.DCtr {
+			merged.DCtr[i] = merged.DCtr[i] + ctr
 		}
 		// merge DPatients
-		for i, ps := range cohort2.DPatients {
+		for i, ps := range cohort.DPatients {
 			for _, p := range ps {
-				cohort1.DPatients[i] = append(cohort1.DPatients[i], p)
+				merged.DPatients[i] = append(merged.DPatients[i], p)
 			}
 		}
 	}
 	fmt.Println("Merged cohort")
-	cohort1.Log(22)
-	return cohort1
+	merged.Log(22)
+	return merged
 }
 
 // Log prints a cohort to standard output.
 func (cohort Cohort) Log(max int) {
-	fmt.Println("Cohort: ")
-	fmt.Println("Age group: ", cohort.AgeGroup, " Sex: ", cohort.Sex, " Region: ", cohort.Region, " Nr of patients: ", cohort.NofPatients, " "+
-		"Nr of diagnoses: ", cohort.NofDiagnoses)
-	fmt.Println("DCtr: [")
-	for i := 0; i < utils.MinInt(max, len(cohort.DCtr)); i++ {
-		fmt.Print(cohort.DCtr[i], ", ")
+	fmt.Println("Cohort:")
+	fmt.Print("Age group: ", cohort.AgeGroup)
+	fmt.Print(" Sex: ", cohort.Sex)
+	fmt.Print(" Region: ", cohort.Region)
+	fmt.Print(" Nr of patients: ", cohort.NofPatients)
+	fmt.Println(" Nr of diagnoses: ", cohort.NofDiagnoses)
+	fmt.Print("DCtr: [")
+	finalIdx := utils.MinInt(max, len(cohort.DCtr))
+	for i := 0; i < finalIdx; i++ {
+		fmt.Print(cohort.DCtr[i])
+		if i != finalIdx-1 {
+			fmt.Print(", ")
+		}
 	}
-	fmt.Println("...]")
+	if len(cohort.DCtr) > max {
+		fmt.Print("...")
+	}
+	fmt.Println("]")
 }
 
 // Pair is a struct for representing a diagnosis pair. It simply stores two diagnosis codes.
