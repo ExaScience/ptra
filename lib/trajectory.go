@@ -126,7 +126,7 @@ type Diagnosis struct {
 }
 
 // AddDiagnosis appends a diagnosis to a patient's list of diagnoses.
-func (p Patient) AddDiagnosis(d *Diagnosis) {
+func (p *Patient) AddDiagnosis(d *Diagnosis) {
 	p.Diagnoses = append(p.Diagnoses, d)
 }
 
