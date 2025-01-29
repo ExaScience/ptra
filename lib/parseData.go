@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //Package ptra implements a patient trajectory analysis tool.
@@ -640,7 +641,7 @@ func parseTriNetXPatientData(file string, nofCohortAges int) (*PatientMap, int) 
 	}()
 	patientMap := &PatientMap{PIDMap: map[int]*Patient{}, PIDStringMap: map[string]int{}}
 	maxYOB := 1850
-	minYOB := 2021
+	minYOB := time.Now().Year() - 1
 	deathCr := 0
 	regions := map[string]int{} //counts per region
 	regionIds := map[string]int{}
