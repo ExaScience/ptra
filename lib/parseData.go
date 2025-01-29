@@ -385,6 +385,9 @@ func initializeIcd10ToCCSRMap(file string) map[string]ccsrCategory {
 		category := ccsrCategory{name: record[2], id: record[3], categories: map[string]string{}}
 		//fill in unique CSSR alternative Categories, up to 6 possible
 		for i := 6; i <= 17; i = i + 2 {
+			if i >= len(record) {
+				panic("Invalid DiagnosisInfo file")
+			}
 			catID := record[i]
 			catName := record[i+1]
 			if catName == "" || catID == "' '" {
