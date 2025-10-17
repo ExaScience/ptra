@@ -48,8 +48,9 @@ Usage:
 Example:
 	ptra ICD10 patient.csv icd10cm_tabular_2022.xml diagnosis.csv ./MIBC_tfiltered/ --nofAgeGroups 10 --lvl 2
 	--maxYears 5 --minYears 0.001 --minPatients 50 --maxTrajectoryLength 5 --minTrajectoryLength 3 --name MICB_tfiltered
-	--ICD9ToICD10File ICD_9_to_10.json --iter 400 --RR 1.0 --saveRR MIBC_tfiltered.csv --cluster
-	--mclPath /home/caherzee/tools/mcl/ --clusterGranularities 40,60,80,100
+	--ICD9ToICD10File ICD_9_to_10.json --iter 400 --RR 1.0 --tumorInfo tumor.csv --saveRR MIBC_tfiltered.csv --cluster
+	--mclPath /home/caherzee/tools/mcl/ --clusterGranularities 40,60,80,100 --pfilters "MIBC" --tumorInfo tumor.csv
+	--tfilters "bc" --treatmentInfo treatments.csv
 
 The flags are:
 
@@ -99,13 +100,23 @@ The flags are:
 	scores, such as maxTrajectoryLenght, minTrajectoryLength, minPatients, RR etc might be explored in other runs.
 --loadRR file
 	Load the RR matrix from file. Such a file must be created by a previous run of ptra with the --saveRR flag.
---pfilters age70+ | age70- | male | female
+--pfilters age70+ | age70- | male | female | Ta | T0 | Tis | T1 | T2 | T3 | T4 | N0 | N1 | N2 | N3 | M0 | M1 |NMIBC | MIBC | mUC
 	A list of filters for selecting patients from whitch to derive trajectories.
+--tumorInfo file
+	A file with information about patients and their tumors. This file contains annotations about the stage of the
+	bladder cancer at a specific time. Cf. TriNetX tumor table. This information is used by filters.
+--tfilters neoplasm | bc
+	A list of filters for reducing the output of trajectories. E.g. neoplasm only outputs trajectories where there is at
+	least one diagnosis related to cancer. bc only outputs trajectories where one diagnosis is (assuming) related to
+	bladder cancer.
+--treatmentInfo file
+	A file with information about patients and their treatments, e.g. MVAC,radical cystectomy, etc. If this file is
+	passed, the treatments will be used as diagnostic codes to calculated trajectories.
 */
 
 const (
-	programVersion = 0.11
-	programName    = "ptra"
+	programVersion = 0.1
+	programName    = "ptra - trinetx"
 )
 
 func programMessage() string {
@@ -128,7 +139,11 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--iter nr]\n" +
 	"[--saveRR file]\n" +
 	"[--loadRR file]\n" +
-	"[--pfilters age70+ | age70- | male | female ]\n" +
+	"[--pfilters age70+ | age70- | male | female | Ta | T0 | Tis | T1 | T2 | T3 | T4 | N0 | N1 | N2 | N3 | M0 | M1 |" +
+	"NMIBC | MIBC | mUC ]\n" +
+	"[--tumorInfo file]\n" +
+	"[--tfilters neoplasm | bc]\n" +
+	"[--treatmentInfo file]\n" +
 	"[--nrOfThreads nr]\n"
 
 func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
