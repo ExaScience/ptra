@@ -99,15 +99,21 @@ Check the documentation of the package manager of your Linux distribution for de
 
 First checkout the `ptra` sources using the following command:
 
-    go get -u github.com/exascience/ptra
+    git clone https://github.com/ExaScience/ptra.git
 
-This downloads the `ptra` Go source code, and creates the `ptra` binary in your configured Go home folder, for example 
-`~/go/bin/ptra`. See the [GOPATH](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) variable for your Go home 
-folder.
+This downloads the `ptra` Go source code.
+
+To build the binary for the TrinetX use case:
+
+    go build -o ptra main_trinetx.go
+
+To build the general binary:
+
+    go build -o ptra main.go
 
 Add the binary to your path, for example:
 
-    export PATH=$PATH:~/go/bin
+    export PATH=$PATH:~/pra/ptra
 
 # 7. Command Line Interface Reference (CLI)
 ## TriNetX Use Case
