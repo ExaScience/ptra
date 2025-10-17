@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"ptra/trajectory"
 	"ptra/utils"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -154,6 +155,87 @@ func printIcd10Hierarchy(hierarchy icd10Hierarchy) {
 		ctr3, " Lvl 3: ", ctr4, " Lvl 4: ", ctr5, " Lvl 5: ", ctr6, " Lvl 6: ", ctr7)
 }
 
+type SuperClass struct {
+	XMLName xml.Name `xml:"SuperClass"`
+	Code    string   `xml:"code,attr"`
+}
+
+type whoRubric struct {
+	XMLName xml.Name `xml:"Rubric"`
+	Label   string   `xml:"Label"`
+}
+
+type whoClass struct {
+	XmlName    xml.Name    `xml:"Class"`
+	Kind       string      `xml:"kind,attr"`
+	Code       string      `xml:"code,attr"`
+	Rubrics    []whoRubric `xml:"Rubric"`
+	SuperClass SuperClass  `xml:"SuperClass"`
+}
+
+func (class whoClass) isChapter() bool {
+	return class.Kind == "chapter"
+}
+
+func (class whoClass) isBlock() bool {
+	return class.Kind == "block"
+}
+
+func (class whoClass) isCategory() bool {
+	return class.Kind == "category"
+}
+
+type whoIcd10Hierarchy struct {
+	XmlName  xml.Name   `xml:"ClaML"` //not being parsed??
+	Chapters []whoClass `xml:"Class"`
+}
+
+type whoICD10HierarchyXML struct {
+	XmlName xml.Name `xml:"Class"`
+}
+
+type cdcICD10HierarchyXML struct {
+	XMLName xml.Name `xml:"ICD10CM.tabular"`
+}
+
+// CheckIcd10HierarchyXMLFile checks
+func CheckIcd10HierarchyXMLFile(file string) string {
+	//open file
+	xmlFile, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer xmlFile.Close()
+	xmlFileBytes, _ := io.ReadAll(xmlFile)
+	cdcHierarchy := cdcICD10HierarchyXML{}
+	xml.Unmarshal(xmlFileBytes, &cdcHierarchy)
+	if cdcHierarchy.XMLName.Local == "ICD10CM.tabular" {
+		return "cdc"
+	}
+	whoHierarchy := whoICD10HierarchyXML{}
+	xml.Unmarshal(xmlFileBytes, &whoHierarchy)
+	if whoHierarchy.XmlName.Local == "Class" {
+		return "who"
+	}
+	fmt.Println(whoHierarchy)
+	return "unknown"
+}
+
+func ParseWhoIcd10HierarchyFromXml(file string) whoIcd10Hierarchy {
+	fmt.Println("Parsing who ICD10 code hierarchy from XML file: ", file)
+	//open file
+	xmlFile, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer xmlFile.Close()
+	xmlFileBytes, _ := ioutil.ReadAll(xmlFile)
+	//unmarshall
+	whoICD10Hierarchy := whoIcd10Hierarchy{}
+	xml.Unmarshal(xmlFileBytes, &whoICD10Hierarchy)
+	return whoICD10Hierarchy
+}
+
 //The ptra program needs a names map that maps DID -> medical name. The following code extracts a name map from an ICD10
 //hierarchy and a given level.
 
@@ -185,6 +267,17 @@ func printIcd10NameMap(table map[string]icd10Name) {
 
 // initializeIcd10NameMap initializes a name map for ICD10 DID -> medical name, level, and categories it belongs to.
 func initializeIcd10NameMap(file string) map[string]icd10Name {
+	target := CheckIcd10HierarchyXMLFile(file)
+	if target == "who" {
+		return InitializeWhoIcd10NameMap(file)
+	}
+	if target == "cdc" {
+		return initializeCdcIcd10NameMap(file)
+	}
+	panic("Unknown file format ICD10 hierarchy")
+}
+
+func initializeCdcIcd10NameMap(file string) map[string]icd10Name {
 	icd10NameMap := map[string]icd10Name{} //maps ICD10 DID to a medical name, level, and categories to which it belongs.
 	icd10Hierarchy := parseIcd10HierarchyFromXml(file)
 	for _, chap := range icd10Hierarchy.Chapters {
@@ -238,6 +331,67 @@ func initializeIcd10NameMap(file string) map[string]icd10Name {
 				}
 			}
 		}
+	}
+	return icd10NameMap
+}
+
+func InitializeWhoIcd10NameMap(file string) map[string]icd10Name {
+	icd10NameMap := map[string]icd10Name{} //maps ICD10 DID to a medical name, level, and categories to which it belongs.
+	whoIcd10Hierarchy := ParseWhoIcd10HierarchyFromXml(file)
+	//map code to chapter
+	chapters := map[string]whoClass{}
+	blocks := map[string]whoClass{}
+	categories := map[string]whoClass{}
+
+	for _, class := range whoIcd10Hierarchy.Chapters {
+		if class.isChapter() {
+			chapters[class.Code] = class
+			continue
+		}
+		if class.isBlock() {
+			blocks[class.Code] = class
+			continue
+		}
+		if class.isCategory() {
+			categories[class.Code] = class
+		}
+	}
+
+	getParentCategory := func(id string) (whoClass, bool) {
+		v, ok := categories[id]
+		if ok {
+			return v, true
+		}
+		v, ok = blocks[id]
+		if ok {
+			return v, true
+		}
+		v, ok = chapters[id]
+		if ok {
+			return v, true
+		}
+		return whoClass{}, false
+	}
+
+	for _, cat := range categories {
+		parent, ok := getParentCategory(cat.SuperClass.Code)
+		pcats := []whoClass{parent}
+		//grab category parents
+		for ok {
+			parent, ok = getParentCategory(parent.SuperClass.Code)
+			if ok {
+				pcats = append(pcats, parent)
+			}
+		}
+		entry := [6]string{"NONE", "NONE", "NONE", "NONE", "NONE", "NONE"}
+		pctr := 0
+		slices.Reverse(pcats)
+		for _, pcat := range pcats {
+			entry[pctr] = pcat.Rubrics[0].Label
+			pctr++
+		}
+		icd10Name := icd10Name{name: cat.Rubrics[0].Label, categories: entry, level: pctr}
+		icd10NameMap[cat.Code] = icd10Name
 	}
 	return icd10NameMap
 }
@@ -833,7 +987,7 @@ func parseTrinetXPatientDiagnoses(diagnosesFile, treatmentInfoFile string, patie
 		}
 		DIDCodeSystem := record[2]
 		DIDString := record[3]
-		if DIDCodeSystem != "ICD-10-CM" {
+		if (DIDCodeSystem != "ICD-10-CM") && (DIDCodeSystem != "ICD-10-WHO") {
 			// try to remap ICD9 code to ICD10 codes
 			if DIDString, ok = icd9ToIcd10Map[DIDString]; !ok {
 				continue // skip unkown ICD9 codes

@@ -1,6 +1,6 @@
 module ptra
 
-go 1.17
+go 1.22
 
 require (
 	gioui.org v0.0.0-20210308172011-57750fc8a0a6 // indirect

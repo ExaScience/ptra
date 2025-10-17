@@ -90,7 +90,7 @@ end
 
 # Plot sex distribution per cluster
 function plot_cluster_sexdistr(df, title)
-    plot(df, y=:Sex, x=:Freq, color=:Sex, ygroup=:CID,
+    plot(df, y=:Sex, x=:Freq, color=:Sex, ygroup=:CID, dpi=1000,
         Geom.subplot_grid(Geom.bar(position=:stack, orientation=:horizontal),
             Guide.ylabel(orientation=:vertical)),
         Guide.colorkey(title="Sex"),
@@ -157,7 +157,7 @@ function plot_ptra_clusters(pfile, cfile)
     sex_table = transform_sex_table(p_unique_sex_pct)
     println("Plotting sex distribution per cluster")
     p3 = plot_cluster_sexdistr(sex_table, "Sex distribution per cluster (%)")
-    return (p1,p2,p3)
+    return (p1,p2,p3, agedf, ageEOIdf, sex_table)
 end
 
 # For nice plotting of p3: set_default_plot_size(21cm, 25cm)

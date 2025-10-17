@@ -39,6 +39,7 @@ func TestInitializeIcd10NameMap(t *testing.T) {
 
 func TestInitializeICD10AnalysisMap(t *testing.T) {
 	file := "./icd10cm_tabular_2022.xml"
+	//file := "./icd102019en.xml"
 	icd10Names := app.InitializeIcd10NameMap(file)
 	app.IntializeIcd10AnalysisMaps(icd10Names, 0)
 	app.IntializeIcd10AnalysisMaps(icd10Names, 1)
