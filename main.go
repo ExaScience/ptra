@@ -162,7 +162,7 @@ func getFileName(s, help string) string {
 	return s
 }
 
-func getPatientFilter(s string, tinfo map[string][]*app.TumorInfo) trajectory.PatientFilter {
+func getPatientFilter(s string) trajectory.PatientFilter {
 	id := func(p *trajectory.Patient) bool { return true }
 	switch s {
 	case "id":
@@ -175,50 +175,20 @@ func getPatientFilter(s string, tinfo map[string][]*app.TumorInfo) trajectory.Pa
 		return trajectory.FemaleFilter()
 	case "female":
 		return trajectory.MaleFilter()
-	case "Ta":
-		return app.TaStageAggregator(tinfo)
-	case "T1":
-		return app.T1StageAggregator(tinfo)
-	case "Tis":
-		return app.TisStageAggregator(tinfo)
-	case "T2":
-		return app.T2StageAggregator(tinfo)
-	case "T3":
-		return app.T3StageAggregator(tinfo)
-	case "T4":
-		return app.T4StageAggregator(tinfo)
-	case "N0":
-		return app.N0StageAggregator(tinfo)
-	case "N1":
-		return app.N1StageAggregator(tinfo)
-	case "N2":
-		return app.N2StageAggregator(tinfo)
-	case "N3":
-		return app.N3StageAggregator(tinfo)
-	case "M0":
-		return app.M0StageAggregator(tinfo)
-	case "M1":
-		return app.M1StageAggregator(tinfo)
 	case "EOI-":
 		return trajectory.EOIAfterFilter()
 	case "EOI+":
 		return trajectory.EOIBeforeFilter()
-	case "MIBC":
-		return app.MIBCAggregator(tinfo)
-	case "NMIBC":
-		return app.NMIBCAggregator(tinfo)
-	case "mUC":
-		return app.MUCAggregator(tinfo)
 	default:
 		return id
 	}
 }
 
-func getPatientFilters(f string, tinfo map[string][]*app.TumorInfo) []trajectory.PatientFilter {
+func getPatientFilters(f string) []trajectory.PatientFilter {
 	fs := strings.Split(f, ",")
 	result := []trajectory.PatientFilter{}
 	for _, f := range fs {
-		result = append(result, getPatientFilter(f, tinfo))
+		result = append(result, getPatientFilter(f))
 	}
 	return result
 }
@@ -339,11 +309,8 @@ func main() {
 	fmt.Fprint(&command, " --maxTrajectoryLength ", maxTrajectoryLength)
 	fmt.Fprint(&command, " --minTrajectoryLength ", minTrajectoryLength)
 	fmt.Fprint(&command, " --name ", name)
-	fmt.Fprint(&command, " --ICD9ToICD10File ", ICD9ToICD10File)
 	fmt.Fprint(&command, " --iter ", iter)
 	fmt.Fprint(&command, " --RR ", rr)
-	fmt.Fprint(&command, " --tumorInfo ", tumorInfo)
-	fmt.Fprint(&command, " --treatmentInfo ", treatmentInfo)
 	if saveRR != "" {
 		fmt.Fprint(&command, " --saveRR ", saveRR)
 	}
@@ -365,13 +332,8 @@ func main() {
 	log.Println(programMessage())
 	log.Println("Executing command:\n", command.String())
 	//1. Parse inputs into experiment
-	// Parse Tumor info
-	tinfo := map[string][]*app.TumorInfo{} // filterInfo is a variable to pass around filter-specific information. E.g. parsed tumor data for the tumor stage filter.
-	if tumorInfo != "" {
-		tinfo = app.ParsetTriNetXTumorData(tumorInfo) // need parsed patients to be able to parse tumor data file
-	}
 	exp, patients := app.ParseTriNetXData("exp1", patientInfo, patientDiagnoses, diagnosisInfo,
-		treatmentInfo, nofAgeGroups, lvl, minYears, maxYears, ICD9ToICD10File, getPatientFilters(pfilters, tinfo))
+		treatmentInfo, nofAgeGroups, lvl, minYears, maxYears, ICD9ToICD10File, getPatientFilters(pfilters))
 	//2. Initialise relative risk ratios or load them from file from a previous run
 	if loadRR != "" {
 		trajectory.LoadRRMatrix(exp, loadRR)
