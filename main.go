@@ -172,6 +172,10 @@ func getPatientFilter(s string) trajectory.PatientFilter {
 		return trajectory.AboveSeventyAggregator()
 	case "age70-":
 		return trajectory.LessThanSeventyAggregator()
+	case "age65-":
+		return trajectory.LessThanSixtyFiveAggregator()
+	case "age65+":
+		return trajectory.AboveSixtyFiveAggregator()
 	case "male":
 		return trajectory.FemaleFilter()
 	case "female":
