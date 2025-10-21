@@ -82,6 +82,8 @@ The flags are:
 	Sets the name of the experiment. This name is used to generate names for output files.
 --cluster
 	If this flag is passed, the computed trajectories are clustered and the clusters are outputted to file.
+--clusterGranularities nr, nr, .., nr
+	The cluster granularities to try. This impacts how many clusters the algorithm tries to find. Default: 40,60,80,100
 --mclPath
 	Sets the path where the mcl binaries can be found.
 --iter nr
@@ -98,6 +100,7 @@ The flags are:
 	Load the RR matrix from file. Such a file must be created by a previous run of ptra with the --saveRR flag.
 --pfilters age70+ | age70- | male | female
 	A list of filters for selecting patients from whitch to derive trajectories.
+--eoi
 */
 
 const (
@@ -119,7 +122,9 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--maxTrajectoryLength nr]\n" +
 	"[--minTrajectoryLength nr]\n" +
 	"[--name string]\n" +
+	"[--eoid icd10,icd10,...,icd10\n" +
 	"[--cluster]\n" +
+	"[--clusterGranularities nr,nr,...,nr]\n" +
 	"[--mclPath string]\n" +
 	"[--iter nr]\n" +
 	"[--saveRR file]\n" +
@@ -238,6 +243,7 @@ func main() {
 		tumorInfo            string
 		treatmentInfo        string
 		nrOfThreads          int
+		eoid                 string
 	)
 	var flags flag.FlagSet
 	// options for the ptra command
@@ -259,6 +265,7 @@ func main() {
 		"diagnoses in a trajectory")
 	flags.StringVar(&name, "name", "exp1", "The name of the run. This is used to generate the "+
 		"names of the output files.")
+	flags.StringVar(&eoid, "eoid", "", "The icd10 codes of the events of interest to track")
 	flags.BoolVar(&clust, "cluster", false, "Cluster the trajectories using MCL and output "+
 		"the results")
 	flags.StringVar(&mclPath, "mclPath", "", "The path to the mcl binary.")
@@ -321,12 +328,15 @@ func main() {
 		runtime.GOMAXPROCS(nrOfThreads)
 		fmt.Fprint(&command, " --nrOfThreads ", nrOfThreads)
 	}
+	if eoid != "" {
+		fmt.Fprint(&command, " --eoid ", eoid)
+	}
 	// start execution
 	log.Println(programMessage())
 	log.Println("Executing command:\n", command.String())
 	//1. Parse inputs into experiment
 	exp, patients := app.ParseData("exp1", patientInfo, patientDiagnoses, diagnosisInfo,
-		nofAgeGroups, lvl, getPatientFilters(pfilters))
+		nofAgeGroups, lvl, getPatientFilters(pfilters), strings.Split(eoid, ","))
 	//2. Initialise relative risk ratios or load them from file from a previous run
 	if loadRR != "" {
 		trajectory.LoadRRMatrix(exp, loadRR)

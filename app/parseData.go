@@ -190,21 +190,22 @@ func parseDiagnosisDate(date string) trajectory.DiagnosisDate {
 }
 
 // EventOfInterest checks if the ICD10 code is related to bladder cancer
-func EventOfInterest(icd10ID string) bool {
-	if icd10ID == "Z85.1" {
-		return true
-	}
-	if len(icd10ID) >= 3 && icd10ID[0:3] == "C83.1" {
-		return true
+func EventOfInterest(icd10ID string, options []string) bool {
+	for _, option := range options {
+		if icd10ID == option {
+			return true
+		}
+		if icd10ID[0:3] == option[0:3] {
+			return true
+		}
 	}
 	return false
 }
 
 // parsePatientDiagnoses parses a csv file containing patient diagnoses. It fills in those diagnoses for the given
 // patients. It uses the icd10AnalysisMap to assign internal analysis DID to the diagnoses.
-// TO DO: Handle ICD09 diagnoses.
 func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap,
-	icd10AnalysisMap AnalysisMaps) {
+	icd10AnalysisMap AnalysisMaps, eoid []string) {
 	file, err := os.Open(diagnosesFile)
 	if err != nil {
 		panic(err)
@@ -241,7 +242,7 @@ func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap
 			continue
 		}
 		//Check if diagnosis is event of interest.
-		if patient.EOIDate == nil && EventOfInterest(DIDString) {
+		if patient.EOIDate == nil && EventOfInterest(DIDString, eoid) {
 			EOICtr++
 			patient.EOIDate = &date // mark first event of interest
 		}
@@ -256,7 +257,7 @@ func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap
 }
 
 func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile string, nofCohortAges, level int,
-	filters []trajectory.PatientFilter) (*trajectory.Experiment, *trajectory.PatientMap) {
+	filters []trajectory.PatientFilter, eoid []string) (*trajectory.Experiment, *trajectory.PatientMap) {
 	// parse data
 	// fill in patients
 	patients, nofRegions := parsePatientData(patientFile, nofCohortAges)
@@ -280,7 +281,7 @@ func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile string, nofCo
 		idMap = maps.getIdMap()
 	}
 	// fill in diagnoses for patients
-	parsePatientDiagnoses(diagnosisFile, patients, analysisMaps)
+	parsePatientDiagnoses(diagnosisFile, patients, analysisMaps, eoid)
 	// Apply patient filter
 	patients = trajectory.ApplyPatientFilters(filters, patients)
 	fmt.Println("Filtered down to: ", len(patients.PIDMap), " patients.")
