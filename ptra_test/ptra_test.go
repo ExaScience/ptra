@@ -41,13 +41,13 @@ func TestInitializeICD10AnalysisMap(t *testing.T) {
 	file := "./icd10cm_tabular_2022.xml"
 	//file := "./icd102019en.xml"
 	icd10Names := app.InitializeIcd10NameMap(file)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 0)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 1)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 2)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 3)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 4)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 5)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 6)
+	app.IntializeIcd10AnalysisMaps(icd10Names, 0, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 1, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 2, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 3, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 4, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 5, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 6, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 }
 
 func TestParseTrinetXPatients(t *testing.T) {
@@ -63,7 +63,7 @@ func TestInitializeCohorts(t *testing.T) {
 	file2 := "./diagnosis.csv"
 	file3 := "./icd10cm_tabular_2022.xml"
 	level := 0
-	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level)
+	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 	app.ParseTrinetXPatientDiagnoses(file2, "", patients, analysisMaps, map[string]string{})
 	nofDiagnosisCodes := analysisMaps.NofDiagnosisCodes
 	nofRegions := 1
@@ -99,7 +99,7 @@ func TestParseTrinetXPatientDiagnoses(t *testing.T) {
 	file2 := "./diagnosis.csv"
 	file3 := "./icd10cm_tabular_2022.xml"
 	level := 0
-	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level)
+	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 	app.ParseTrinetXPatientDiagnoses(file2, "", patients, analysisMaps, map[string]string{})
 	fmt.Println("First 5 patients: ")
 	ctr := 0
@@ -263,7 +263,8 @@ func TestInitCohortsWithFakePatients(t *testing.T) {
 		fmt.Print(rr, ", ")
 	}
 	fmt.Println("...]")
-	trajectories := trajectory.BuildTrajectories(exp, 5, 3, 2, 1, 5, 1.0, []trajectory.TrajectoryFilter{})
+	trajectories := trajectory.BuildTrajectories(exp, 5, 3, 2, 1, 5,
+		1.0, []trajectory.TrajectoryFilter{})
 	fmt.Println("Collected ", len(trajectories), " trajectories.")
 	for _, traj := range trajectories {
 		trajectory.PrintTrajectory(traj, exp)

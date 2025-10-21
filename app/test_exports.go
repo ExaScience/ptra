@@ -27,3 +27,5 @@ var ParseTrinetXPatientDiagnoses = parseTrinetXPatientDiagnoses
 var ParseIcd10HierarchyFromXml = parseIcd10HierarchyFromXml
 var PrintIcd10Hierarchy = printIcd10Hierarchy
 var PrintIcd10NameMap = printIcd10NameMap
+var GetIcd10DescToExcludeFromTriNetXAnalysis = getIcd10DescToExcludeFromTriNetXAnalysis
+var GetIcd10CodesToExcludeFromTriNetXAnalysis = getIcd10CodesToExcludeFromTriNetXAnalysis

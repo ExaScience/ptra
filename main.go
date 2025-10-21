@@ -80,9 +80,6 @@ The flags are:
 	diagnoses.
 --name string
 	Sets the name of the experiment. This name is used to generate names for output files.
---ICD9ToICD10File file
-	A json file that provides a mapping from ICD9 to ICD10 codes. The input may be mixed ICD9 and ICD10 codes. With this
-	mapping, the tool can automatically convert all diagnosis codes to ICD10 codes for analysis.
 --cluster
 	If this flag is passed, the computed trajectories are clustered and the clusters are outputted to file.
 --mclPath
@@ -122,7 +119,6 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--maxTrajectoryLength nr]\n" +
 	"[--minTrajectoryLength nr]\n" +
 	"[--name string]\n" +
-	"[--ICD9ToICD10File file]\n" +
 	"[--cluster]\n" +
 	"[--mclPath string]\n" +
 	"[--iter nr]\n" +
@@ -230,7 +226,6 @@ func main() {
 		maxTrajectoryLength  int
 		minTrajectoryLength  int
 		name                 string
-		ICD9ToICD10File      string
 		clust                bool
 		mclPath              string
 		clusterGranularities string
@@ -264,8 +259,6 @@ func main() {
 		"diagnoses in a trajectory")
 	flags.StringVar(&name, "name", "exp1", "The name of the run. This is used to generate the "+
 		"names of the output files.")
-	flags.StringVar(&ICD9ToICD10File, "ICD9ToICD10File", "", "A json file that maps ICD9 to "+
-		"ICD10 codes.")
 	flags.BoolVar(&clust, "cluster", false, "Cluster the trajectories using MCL and output "+
 		"the results")
 	flags.StringVar(&mclPath, "mclPath", "", "The path to the mcl binary.")
@@ -332,8 +325,8 @@ func main() {
 	log.Println(programMessage())
 	log.Println("Executing command:\n", command.String())
 	//1. Parse inputs into experiment
-	exp, patients := app.ParseTriNetXData("exp1", patientInfo, patientDiagnoses, diagnosisInfo,
-		treatmentInfo, nofAgeGroups, lvl, minYears, maxYears, ICD9ToICD10File, getPatientFilters(pfilters))
+	exp, patients := app.ParseData("exp1", patientInfo, patientDiagnoses, diagnosisInfo,
+		nofAgeGroups, lvl, getPatientFilters(pfilters))
 	//2. Initialise relative risk ratios or load them from file from a previous run
 	if loadRR != "" {
 		trajectory.LoadRRMatrix(exp, loadRR)
