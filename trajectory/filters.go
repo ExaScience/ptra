@@ -172,3 +172,11 @@ func LessThanSixtyFiveAggregator() PatientFilter {
 func AboveSixtyFiveAggregator() PatientFilter {
 	return ageAboveAggregator(65)
 }
+
+func AgeLessThanAggregator(age int) PatientFilter {
+	return ageLessAggregator(age)
+}
+
+func AgeAboveAggregator(age int) PatientFilter {
+	return ageAboveAggregator(age)
+}

@@ -98,7 +98,7 @@ The flags are:
 	scores, such as maxTrajectoryLenght, minTrajectoryLength, minPatients, RR etc might be explored in other runs.
 --loadRR file
 	Load the RR matrix from file. Such a file must be created by a previous run of ptra with the --saveRR flag.
---pfilters age70+ | age70- | male | female
+--pfilters age+:nr | age-:nr | sex:male | sex:female
 	A list of filters for selecting patients from whitch to derive trajectories.
 --eoi
 */
@@ -129,7 +129,7 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--iter nr]\n" +
 	"[--saveRR file]\n" +
 	"[--loadRR file]\n" +
-	"[--pfilters age70+ | age70- | male | female ]\n" +
+	"[--pfilters age+:nr,age-:nr,[sex:male | sex:female] ]\n" +
 	"[--nrOfThreads nr]\n"
 
 func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
@@ -168,25 +168,44 @@ func getPatientFilter(s string) trajectory.PatientFilter {
 	switch s {
 	case "id":
 		return id
-	case "age70+":
-		return trajectory.AboveSeventyAggregator()
-	case "age70-":
-		return trajectory.LessThanSeventyAggregator()
-	case "age65-":
-		return trajectory.LessThanSixtyFiveAggregator()
-	case "age65+":
-		return trajectory.AboveSixtyFiveAggregator()
-	case "male":
-		return trajectory.FemaleFilter()
-	case "female":
-		return trajectory.MaleFilter()
 	case "EOI-":
 		return trajectory.EOIAfterFilter()
 	case "EOI+":
 		return trajectory.EOIBeforeFilter()
-	default:
-		return id
 	}
+	fs := strings.Split(s, ":")
+	if len(fs) > 1 {
+		switch fs[0] {
+		case "age+":
+			{
+				age, err := strconv.Atoi(fs[1])
+				if err != nil {
+					panic("Age passed to age+ not a well-formed integer: " + fs[1])
+				}
+				return trajectory.AgeAboveAggregator(age)
+			}
+		case "age-":
+			{
+				age, err := strconv.Atoi(fs[1])
+				if err != nil {
+					panic("Age passe to age- not a well-formed integer: " + fs[1])
+				}
+				return trajectory.AgeLessThanAggregator(age)
+			}
+		case "sex":
+			{
+				gender := fs[1]
+				if gender == "male" {
+					return trajectory.MaleFilter()
+				}
+				if gender == "female" {
+					return trajectory.FemaleFilter()
+				}
+				panic("Unknown gender: " + gender)
+			}
+		}
+	}
+	return id
 }
 
 func getPatientFilters(f string) []trajectory.PatientFilter {
@@ -286,7 +305,8 @@ func main() {
 		"patients.")
 	flags.StringVar(&tumorInfo, "tumorInfo", "", "A file with information about the tumor stages.")
 	flags.StringVar(&treatmentInfo, "treatmentInfo", "", "A file with information about patient cancer stages.")
-	flags.StringVar(&tfilters, "tfilters", "id", "A list of pfilters to restrict output of trajectories")
+	flags.StringVar(&tfilters, "tfilters", "id", "A list of filters to restrict output of trajectories."+
+		"Either of the form \"code:icd,icd,icd\" or \"neoplasm\" ")
 	// parse optional arguments
 	parseFlags(flags, 5, ptraHelp)
 	// parse required arguments

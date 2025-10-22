@@ -192,11 +192,13 @@ func parseDiagnosisDate(date string) trajectory.DiagnosisDate {
 // EventOfInterest checks if the ICD10 code is related to bladder cancer
 func EventOfInterest(icd10ID string, options []string) bool {
 	for _, option := range options {
-		if icd10ID == option {
+		if icd10ID == option { //specific ICD10
 			return true
 		}
-		if icd10ID[0:3] == option[0:3] {
-			return true
+		if len(option) == 3 { //the whole category
+			if icd10ID[0:3] == option[0:3] {
+				return true
+			}
 		}
 	}
 	return false
