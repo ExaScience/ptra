@@ -99,8 +99,16 @@ The flags are:
 --loadRR file
 	Load the RR matrix from file. Such a file must be created by a previous run of ptra with the --saveRR flag.
 --pfilters age+:nr | age-:nr | sex:male | sex:female
-	A list of filters for selecting patients from whitch to derive trajectories.
---eoi
+	A list of filters for selecting patients from which to derive trajectories. The form of a filter is tag:value. E.g.
+	sex:male says to select only male patients.
+--eoi icd10,icd10,...icd10
+	A list of icd10 codes for identifying the event of interest. The event of interest can be used for analyzing or
+	filtering trajectories
+--tfilters cat:[neoplasm | bc], code:icd10;icd10;...icd10
+	A list of filters for reducing the output of trajectories. The form to specify a filter is tag:value.
+    E.g. cat:neoplasm only outputs trajectories where there is at least one diagnosis related to cancer. cat:bc only
+	outputs trajectories where at least one diagnosis is related to bladder cancer. The code: tag can be used to list
+	a number of ICD10 codes of which at least one should occur in the trajectory.
 */
 
 const (
@@ -130,6 +138,7 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--saveRR file]\n" +
 	"[--loadRR file]\n" +
 	"[--pfilters age+:nr,age-:nr,[sex:male | sex:female] ]\n" +
+	"[--tfilters cat:[neoplasms | bc],code:icd10;...;icd10]\n" +
 	"[--nrOfThreads nr]\n"
 
 func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
@@ -196,16 +205,28 @@ func getPatientFilter(s string) trajectory.PatientFilter {
 			{
 				gender := fs[1]
 				if gender == "male" {
-					return trajectory.MaleFilter()
+					return trajectory.FemaleFilter()
 				}
 				if gender == "female" {
-					return trajectory.FemaleFilter()
+					return trajectory.MaleFilter()
 				}
 				panic("Unknown gender: " + gender)
 			}
+		default:
+			panic("Unknown patient filter: " + s)
+		}
+	} else {
+		switch s {
+		case "eoi-":
+			return trajectory.EOIAfterFilter()
+		case "eoi+":
+			return trajectory.EOIBeforeFilter()
+		case "id":
+			return id
+		default:
+			panic("Unknown patient filter: " + s)
 		}
 	}
-	return id
 }
 
 func getPatientFilters(f string) []trajectory.PatientFilter {
@@ -219,13 +240,24 @@ func getPatientFilters(f string) []trajectory.PatientFilter {
 
 func getTrajectoryFilter(s string, exp *trajectory.Experiment) trajectory.TrajectoryFilter {
 	id := func(t *trajectory.Trajectory) bool { return true }
-	switch s {
-	case "neoplasm":
-		return app.CancerTrajectoryFilter(exp)
-	case "bc":
-		return app.BladderCancerTrajectoryFilter(exp)
-	default:
+	ss := strings.Split(s, ":")
+	switch ss[0] {
+	case "cat":
+		switch ss[1] {
+		case "neoplasm":
+			return app.CancerTrajectoryFilter(exp)
+		case "bc":
+			return app.BladderCancerTrajectoryFilter(exp)
+		default:
+			panic("Unknown category for trajectory filter: cat:" + ss[1])
+		}
+	case "code":
+		codes := strings.Split(ss[1], ";")
+		return app.Icd10TrajectoryFilter(exp, codes)
+	case "id":
 		return id
+	default:
+		panic("Unknown trajectory filter: " + ss[0])
 	}
 }
 
@@ -306,7 +338,7 @@ func main() {
 	flags.StringVar(&tumorInfo, "tumorInfo", "", "A file with information about the tumor stages.")
 	flags.StringVar(&treatmentInfo, "treatmentInfo", "", "A file with information about patient cancer stages.")
 	flags.StringVar(&tfilters, "tfilters", "id", "A list of filters to restrict output of trajectories."+
-		"Either of the form \"code:icd,icd,icd\" or \"neoplasm\" ")
+		"A list of options of the form \"code:icd;icd;icd\" or \"cat:[neoplasm | bc]\"")
 	// parse optional arguments
 	parseFlags(flags, 5, ptraHelp)
 	// parse required arguments

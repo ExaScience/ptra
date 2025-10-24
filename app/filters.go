@@ -284,7 +284,7 @@ func Icd10TrajectoryFilter(exp *trajectory.Experiment, codes []string) trajector
 	codeRelatedMap := map[int]bool{}
 	for did, _ := range exp.NameMap {
 		icdCode := exp.IdMap[did]
-		if len(icdCode) <= 3 {
+		if len(icdCode) >= 3 {
 			subCode := icdCode[0:3]
 			if codeMember(subCode, codes) {
 				codeRelatedMap[did] = true
