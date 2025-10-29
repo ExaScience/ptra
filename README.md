@@ -106,11 +106,11 @@ This downloads the `ptra` Go source code.
 
 To build the generic binary:
 
-    go build -o ptra main.go
+    go build -o ptra cmd/main.go
 
 To build the binary for the TrinetX use case:
 
-    go build -o ptra_trinetx main_trinetx.go
+    go build -o ptra_trinetx cmd/main_trinetx.go
 
 Add the binary to your path, for example:
 
@@ -130,6 +130,7 @@ WHO format
         --minTrajectoryLength nr --name string --cluster --mclPath string --iter nr --saveRR file --loadRR file
         --pfilters [age+:nr,age-:nr,sex:[male | female]]
         --tfilters [cat:[neoplasms|bc],code:icd10;icd10,...]
+        --actFile file
 ```
 ### Description
 The `ptra` command requires four arguments:
@@ -267,6 +268,11 @@ A list of icd10 codes that represent the event of interest to track (e.g. cancer
 for example be used in the patient filter (`--pfilters`) option (`eoi+ | eoi-`) to remove all diagnoses before/after the
 event of interest. Is also used in the metrics that are generated for the clusters, e.g. to annotate the average age of 
 patients at the time of the event of interest.
+
+* `--actFile file`
+
+A file containing WHO ACT codes, mapping a unique ACT ID to description. ACT codes may be registered in a similar way as 
+diagnoses and are included as events in trajectory building.
 
 ## TriNetX Use Case
 ### Name

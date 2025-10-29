@@ -139,7 +139,8 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--loadRR file]\n" +
 	"[--pfilters age+:nr,age-:nr,[sex:male | sex:female] ]\n" +
 	"[--tfilters cat:[neoplasms | bc],code:icd10;...;icd10]\n" +
-	"[--nrOfThreads nr]\n"
+	"[--nrOfThreads nr]\n" +
+	"[--actFile file]\n"
 
 func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
 	if len(os.Args) < requiredArgs {
@@ -299,6 +300,7 @@ func main() {
 		treatmentInfo        string
 		nrOfThreads          int
 		eoid                 string
+		actFile              string
 	)
 	var flags flag.FlagSet
 	// options for the ptra command
@@ -339,6 +341,7 @@ func main() {
 	flags.StringVar(&treatmentInfo, "treatmentInfo", "", "A file with information about patient cancer stages.")
 	flags.StringVar(&tfilters, "tfilters", "id", "A list of filters to restrict output of trajectories."+
 		"A list of options of the form \"code:icd;icd;icd\" or \"cat:[neoplasm | bc]\"")
+	flags.StringVar(&actFile, "actFile", "", "A files with ACT codes")
 	// parse optional arguments
 	parseFlags(flags, 5, ptraHelp)
 	// parse required arguments
@@ -387,11 +390,14 @@ func main() {
 	if eoid != "" {
 		fmt.Fprint(&command, " --eoid ", eoid)
 	}
+	if actFile != "" {
+		fmt.Fprint(&command, " --actFile ", actFile)
+	}
 	// start execution
 	log.Println(programMessage())
 	log.Println("Executing command:\n", command.String())
 	//1. Parse inputs into experiment
-	exp, patients := app.ParseData("exp1", patientInfo, patientDiagnoses, diagnosisInfo,
+	exp, patients := app.ParseData("exp1", patientInfo, patientDiagnoses, diagnosisInfo, actFile,
 		nofAgeGroups, lvl, getPatientFilters(pfilters), strings.Split(eoid, ","))
 	//2. Initialise relative risk ratios or load them from file from a previous run
 	if loadRR != "" {

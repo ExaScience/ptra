@@ -60,6 +60,36 @@ func getIcd10CodesToExcludeFromAnalysis() map[string]bool {
 	return exclude
 }
 
+// Parsing ATC codes
+// parseATCCodes parses a files with ATC codes + descriptions. Input: a csv file with the header:
+// atc_code,atc_name,ddd,uom,adm_r,note. Returns a map: code -> description.
+func parseATCCodes(file string) map[string]string {
+	dct := map[string]string{}
+	//open file
+	csvFile, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := csvFile.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	reader := csv.NewReader(csvFile)
+	reader.Read() //skip header
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		dct[record[0]] = record[1]
+	}
+	return dct
+}
+
 // Parsing patient information.
 // parsePatientData parses a file with patient information. Input: a patient file in csv
 // format, a desired number of age groups to initialize cohorts. Diagnoses of the patient need to be filled in after
@@ -83,7 +113,7 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 	regionIds := map[string]int{}
 	//parse file
 	reader := csv.NewReader(csvFile)
-	//the header is omitted from the patient file, but is should be: patient_id, sex, race, ethnicity, year_of_birth,
+	//the header should be: patient_id, sex, race, ethnicity, year_of_birth,
 	//age_at_death, patient_regional_location, postal_code, marital_status, reason_yob_missing, month_year_death,
 	//source_id
 	for {
@@ -258,7 +288,25 @@ func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap
 	fmt.Println("and of which ", EOICtr, " events of interest.")
 }
 
-func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile string, nofCohortAges, level int,
+func (maps *icd10AnalysisMapsFromXML) extendWithATC(file string) {
+	codes := parseATCCodes(file)
+	for code, desc := range codes {
+		maps.NofDiagnosisCodes++
+		maps.DIDMap[code] = maps.NofDiagnosisCodes
+		maps.NameMap[maps.NofDiagnosisCodes] = desc
+	}
+}
+
+func (maps *icd10AnalysisMapsFromCCSR) extendWithATC(file string) {
+	codes := parseATCCodes(file)
+	for code, desc := range codes {
+		maps.NofDiagnosisCodes++
+		maps.DIDMap[code] = []int{maps.NofDiagnosisCodes}
+		maps.NameMap[maps.NofDiagnosisCodes] = desc
+	}
+}
+
+func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile, actFile string, nofCohortAges, level int,
 	filters []trajectory.PatientFilter, eoid []string) (*trajectory.Experiment, *trajectory.PatientMap) {
 	// parse data
 	// fill in patients
@@ -270,6 +318,9 @@ func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile string, nofCo
 	var idMap map[int]string
 	if filepath.Ext(diagnosisInfoFile) == ".xml" {
 		maps := initializeIcd10AnalysisMapsFromXML(diagnosisInfoFile, level, getIcd10DescToExcludeFromAnalysis())
+		if actFile != "" {
+			maps.extendWithATC(actFile)
+		}
 		analysisMaps = maps
 		nofDiagnosisCodes = maps.NofDiagnosisCodes
 		nameMap = maps.NameMap
@@ -277,6 +328,9 @@ func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile string, nofCo
 	}
 	if filepath.Ext(diagnosisInfoFile) == ".csv" || filepath.Ext(diagnosisInfoFile) == ".CSV" {
 		maps := initializeIcd10AnalysisMapsFromCCSR(diagnosisInfoFile, getIcd10CodesToExcludeFromAnalysis())
+		if actFile != "" {
+			maps.extendWithATC(actFile)
+		}
 		analysisMaps = maps
 		nofDiagnosisCodes = maps.NofDiagnosisCodes
 		nameMap = maps.NameMap
