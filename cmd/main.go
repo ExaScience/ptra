@@ -98,7 +98,7 @@ The flags are:
 	scores, such as maxTrajectoryLenght, minTrajectoryLength, minPatients, RR etc might be explored in other runs.
 --loadRR file
 	Load the RR matrix from file. Such a file must be created by a previous run of ptra with the --saveRR flag.
---pfilters age+:nr | age-:nr | sex:male | sex:female
+--pfilters age+:nr | age-:nr | sex:male | sex:female | control:yes | control:no
 	A list of filters for selecting patients from which to derive trajectories. The form of a filter is tag:value. E.g.
 	sex:male says to select only male patients.
 --eoi icd10,icd10,...icd10
@@ -137,7 +137,7 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--iter nr]\n" +
 	"[--saveRR file]\n" +
 	"[--loadRR file]\n" +
-	"[--pfilters age+:nr,age-:nr,[sex:male | sex:female] ]\n" +
+	"[--pfilters age+:nr,age-:nr,sex:[male | female],control:[yes | no] ]\n" +
 	"[--tfilters cat:[neoplasms | bc],code:icd10;...;icd10]\n" +
 	"[--nrOfThreads nr]\n" +
 	"[--actFile file]\n"
@@ -212,6 +212,17 @@ func getPatientFilter(s string) trajectory.PatientFilter {
 					return trajectory.MaleFilter()
 				}
 				panic("Unknown gender: " + gender)
+			}
+		case "control":
+			{
+				target := fs[1]
+				if target == "yes" {
+					return trajectory.ControlFilter(true)
+				}
+				if target == "no" {
+					return trajectory.ControlFilter(false)
+				}
+				panic("Unknown control option: " + target)
 			}
 		default:
 			panic("Unknown patient filter: " + s)

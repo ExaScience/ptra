@@ -163,20 +163,26 @@ func AboveSeventyAggregator() PatientFilter {
 	return ageAboveAggregator(70)
 }
 
-// LessThanSixtyFiveAggregator collects all patients below 65
-func LessThanSixtyFiveAggregator() PatientFilter {
-	return ageLessAggregator(65)
-}
-
-// AboveSixtyFiveAggregator collects all patients above 65
-func AboveSixtyFiveAggregator() PatientFilter {
-	return ageAboveAggregator(65)
-}
-
 func AgeLessThanAggregator(age int) PatientFilter {
 	return ageLessAggregator(age)
 }
 
 func AgeAboveAggregator(age int) PatientFilter {
 	return ageAboveAggregator(age)
+}
+
+// ageAboveAggretator collects all patients older than a specific age and removes all diagnoses before that date.
+func ControlFilter(control bool) PatientFilter {
+	return func(p *Patient) bool {
+		if control {
+			if p.Control {
+				return true
+			}
+			return false
+		}
+		if p.Control {
+			return false
+		}
+		return true
+	}
 }

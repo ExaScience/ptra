@@ -135,8 +135,7 @@ WHO format
 ### Description
 The `ptra` command requires four arguments:
 1. `patientInfoFile`: this is a csv file containing patient information. The expected csv header is:
-   `patient_id, sex, race, ethnicity, year_of_birth, age_at_death, patient_regional_location, postal_code,
-   marital_status, reason_yob_missing, month_year_death, source_id`
+   `patient_id, sex, year_of_birth, patient_regional_location, month_year_death`
 2. `diagnosisInfoFile`: this is a file mapping diagnosis IDs (ICD10) onto medical descriptions. This can
    either be:
    * an XML file containing the CDC ICD10 hierarchy with medical descriptors ([icd10cm_tabular_2022.xml](https://www.cms.gov/medicare/icd-10/2022-icd-10-cm))

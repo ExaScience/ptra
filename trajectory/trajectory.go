@@ -50,6 +50,7 @@ type Patient struct {
 	EOIDate   *DiagnosisDate //Event of interest date, e.g. day of cancer diagnosis
 	DeathDate *DiagnosisDate //Date of death
 	Region    int            //Region where the patient lives
+	Control   bool
 }
 
 // AppendPatient appends a patient to a slice of patients, unless that patient is already a member of that slice.

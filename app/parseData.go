@@ -116,6 +116,8 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 	//the header should be: patient_id, sex, race, ethnicity, year_of_birth,
 	//age_at_death, patient_regional_location, postal_code, marital_status, reason_yob_missing, month_year_death,
 	//source_id
+	//skip header
+	reader.Read()
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -125,7 +127,7 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 			panic(err)
 		}
 		var yob int
-		if yob, err = strconv.Atoi(record[4]); err != nil {
+		if yob, err = strconv.Atoi(record[2]); err != nil {
 			continue //skip patients without year of birth
 		}
 		pidString := record[0]
@@ -140,7 +142,7 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 			sex = trajectory.Female
 			patientMap.FemaleCtr++
 		}
-		dateOfDeathString := record[10]
+		dateOfDeathString := record[4]
 		var dateOfDeath *trajectory.DiagnosisDate
 		if len(dateOfDeathString) == 6 {
 			year, err := strconv.Atoi(dateOfDeathString[0:4])
@@ -156,12 +158,16 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 				}
 			}
 		}
-		region := record[6]
+		region := record[3]
 		if _, ok := regions[region]; !ok {
 			regions[region] = 0
 			regionIds[region] = len(regionIds)
 		} else {
 			regions[region]++
+		}
+		control := false
+		if record[5] == "yes" {
+			control = true
 		}
 		patient := trajectory.Patient{
 			PID:       pid,
@@ -172,6 +178,7 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 			Diagnoses: []*trajectory.Diagnosis{},
 			DeathDate: dateOfDeath,
 			Region:    regionIds[region],
+			Control:   control,
 		}
 		patientMap.PIDMap[pid] = &patient
 		patientMap.PIDStringMap[pidString] = pid
@@ -251,6 +258,7 @@ func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap
 	ctr := 0 //for counting the number of parsed diagnoses
 	ctrExcl := 0
 	EOICtr := 0
+	reader.Read() //skip header
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -265,8 +273,8 @@ func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap
 		if !ok {
 			continue //skip unknown patients
 		}
-		DIDString := record[3]
-		date := parseDiagnosisDate(record[7])
+		DIDString := record[2]
+		date := parseDiagnosisDate(record[3])
 
 		nr := icd10AnalysisMap.fillInPatientDiagnoses(patient, DIDString, date)
 		if nr > 0 {
