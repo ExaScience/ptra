@@ -313,7 +313,7 @@ func PrintClustersToCSVFiles(exp *Experiment, pName, cName string) {
 		panic(err)
 	}
 	// print header
-	fmt.Fprintf(pFile, "PID,AgeEOI,Sex,PIDString\n")
+	fmt.Fprintf(pFile, "PID,AgeEOI,Sex,PIDString,Control\n")
 	pSeen := map[int]bool{}
 	for _, t := range exp.Trajectories {
 		ps := t.Patients
@@ -327,7 +327,13 @@ func PrintClustersToCSVFiles(exp *Experiment, pName, cName string) {
 				} else {
 					sex = "F"
 				}
-				fmt.Fprintf(pFile, "%d,%d,%s,%s\n", p.PID, ageEOI, sex, p.PIDString)
+				var control string
+				if p.Control {
+					control = "yes"
+				} else {
+					control = "no"
+				}
+				fmt.Fprintf(pFile, "%d,%d,%s,%s,%s\n", p.PID, ageEOI, sex, p.PIDString, control)
 			}
 		}
 	}

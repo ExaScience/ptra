@@ -16,6 +16,14 @@
 # License and Additional Terms along with this program. If not, see
 # <https://github.com/ExaScience/ptra/blob/master/LICENSE.txt>.
 
+import Pkg
+Pkg.add("DataFrames")
+Pkg.add("Statistics")
+Pkg.add("Gadfly")
+Pkg.add("Cairo")
+Pkg.add("Fontconfig")
+Pkg.add("CSV")
+
 using DataFrames, Statistics, Gadfly, Cairo, Fontconfig, CSV
 
 # Support functions
@@ -60,6 +68,26 @@ function sex_distr_unique(df::DataFrame)
     return (Females=fctr, Males=mctr, Ratio=mctr/fctr)
 end
 
+# Function to count nr of control/patients/ratio
+function control_distr_unique(df::DataFrame)
+    pctr = 0
+    cctr = 0
+    pid_seen = Dict{Int, Bool}();
+    for i in 1:length(df.Control)
+        control = df.Control[i]
+        pid = df.PID[i]
+        if !haskey(pid_seen, pid)
+            pid_seen[pid] = true
+            if control == "no"
+                pctr = pctr + 1
+            else
+                cctr = cctr + 1
+            end
+        end
+    end
+    return (Patients=pctr, Controls=pctr, Ratio=cctr/pctr)
+end
+
 function sex_distr_unique(v1, v2)
     fctr = 0
     mctr = 0
@@ -77,6 +105,25 @@ function sex_distr_unique(v1, v2)
         end
     end
     return (Females=fctr, Males=mctr)
+end
+
+function control_distr_unique(v1, v2)
+    cctr = 0
+    pctr = 0
+    pid_seen = Dict{Int, Bool}();
+    for i in 1:length(v1)
+        pid = v1[i]
+        control = v2[i]
+        if !haskey(pid_seen, pid)
+            pid_seen[pid] = true
+            if control == "no"
+                pctr = pctr + 1
+            else
+                cctr = cctr + 1
+            end
+        end
+    end
+    return (Patients=pctr, Controls=cctr)
 end
 
 # Scale male/female counts with regard to total nr of males/females.
@@ -98,6 +145,17 @@ function plot_cluster_sexdistr(df, title)
         Guide.title(title))
 end
 
+# Plot control distribution per cluster
+function plot_cluster_controldistr(df, title)
+    plot(df, y=:Control, x=:Freq, color=:Control, ygroup=:CID, dpi=1000,
+        Geom.subplot_grid(Geom.bar(position=:stack, orientation=:horizontal),
+            Guide.ylabel(orientation=:vertical)),
+        Guide.colorkey(title="Sex"),
+        Guide.ylabel("Cluster"), Guide.xlabel("Frequency(%)"),
+        Guide.title(title))
+end
+
+
 # Transform sex distribution information into a dataframe for plotting.
 function transform_sex_table(df)
     s = []
@@ -112,6 +170,22 @@ function transform_sex_table(df)
         f = push!(f, r."Males(%)")
     end
     return DataFrame(CID=c, Sex=s, Freq=f)
+end
+
+# Transform control distribution information into a dataframe for plotting.
+function transform_control_table(df)
+    s = []
+    f = []
+    c = []
+    for r in eachrow(df)
+        c = push!(c, r.CID)
+        s = push!(s, "Patients")
+        f = push!(f, r."Patients(%)")
+        c = push!(c, r.CID)
+        s = push!(s, "Control")
+        f = push!(f, r."Controls(%)")
+    end
+    return DataFrame(CID=c, Control=s, Freq=f)
 end
 
 # Main plot function
@@ -147,17 +221,29 @@ function plot_ptra_clusters(pfile, cfile)
 
     p_sex = sex_distr_unique(pdf)
     println("Male/female distribution: ", p_sex)
-    println("Computing make/female distribution per cluster")
+    println("Computing male/female distribution per cluster")
     p_unique_sex = combine(gdf, [:PID,:Sex]=>sex_distr_unique=>AsTable) #Counting unique males/females per cluster
 
-    p_unique_sex_pct = select(p_unique_sex, :CID=>:CID, 
-                             :Females=>(v->vscale(v, p_sex.Females))=>"Females(%)", 
+    p_unique_sex_pct = select(p_unique_sex, :CID=>:CID,
+                             :Females=>(v->vscale(v, p_sex.Females))=>"Females(%)",
                              :Males=>(v->vscale(v, p_sex.Males))=>"Males(%)")
 
     sex_table = transform_sex_table(p_unique_sex_pct)
     println("Plotting sex distribution per cluster")
     p3 = plot_cluster_sexdistr(sex_table, "Sex distribution per cluster (%)")
-    return (p1,p2,p3, agedf, ageEOIdf, sex_table)
+
+    p_control = control_distr_unique(pdf)
+    println("Patient/Control distribution: ", p_control)
+    println("Computing patient/control distribution per cluster")
+    p_unique_control = combine(gdf, [:PID,:Control]=>control_distr_unique=>AsTable) #Counting unique patients/controls per cluster
+    p_unique_control_pct = select(p_unique_control, :CID=>:CID,
+                                    :Patients=>(v->vscale(v, p_control.Patients))=>"Patients(%)",
+                                    :Controls=>(v->vscale(v, p_control.Controls))=>"Controls(%)")
+    control_table = transform_control_table(p_unique_control_pct)
+    println("Plotting control distribution per cluster")
+    p4 = plot_cluster_controldistr(control_table, "Control distribution per cluster (%)")
+    #draw(PNG("sex_distribution.png", 21cm, 25cm), p3)
+    return (p1, p2, p3, p4, agedf, ageEOIdf, sex_table, control_table)
 end
 
 # For nice plotting of p3: set_default_plot_size(21cm, 25cm)
