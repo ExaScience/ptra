@@ -480,7 +480,7 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 		for _, t := range collected {
 			for _, node := range t.Diagnoses {
 				if _, ok := nodePrinted[node]; !ok {
-					fmt.Fprintf(ofile, fmt.Sprintf("    c%d_%d [label=\"%s\"]\n", nofClusters-1, node, exp.NameMap[node]))
+					fmt.Fprintf(ofile, fmt.Sprintf("    c%d_%d [label=\"%s\"]\n", nofClusters-1, node, utils.WrapText(exp.NameMap[node], 25)))
 					nodePrinted[node] = true
 				}
 			}
