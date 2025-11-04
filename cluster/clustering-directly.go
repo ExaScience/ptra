@@ -480,7 +480,7 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 		for _, t := range collected {
 			for _, node := range t.Diagnoses {
 				if _, ok := nodePrinted[node]; !ok {
-					fmt.Fprintf(ofile, fmt.Sprintf("    %d [label=\"%s\"]\n", node, exp.NameMap[node]))
+					fmt.Fprintf(ofile, fmt.Sprintf("    c%d_%d [label=\"%s\"]\n", nofClusters-1, node, exp.NameMap[node]))
 					nodePrinted[node] = true
 				}
 			}
@@ -498,7 +498,8 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 				if !edgePrinted[d1][d2] {
 					edgePrinted[d1][d2] = true
 					RR := strconv.FormatFloat(exp.DxDRR[d1][d2], 'f', 2, 64)
-					fmt.Fprintf(ofile, fmt.Sprintf("    %d -> %d [label=\"%s\" penwidth=%s weight=%s]\n", d1, d2, RR, RR, RR))
+					fmt.Fprintf(ofile,
+						fmt.Sprintf("    c%d_%d -> c%d_%d [label=\"%s\" penwidth=%s weight=%s]\n", nofClusters-1, d1, nofClusters-1, d2, RR, RR, RR))
 				}
 				d1 = d2
 				tctr++
