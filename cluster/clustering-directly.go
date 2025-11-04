@@ -448,7 +448,7 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 
 	// print dot directional-graph header, and some formatting
 	fmt.Fprintf(ofile, "digraph {\n")
-	fmt.Fprintf(ofile, "  node [fontsize=24 fillcolor=magenta style=filled color=darkgreen]")
+	fmt.Fprintf(ofile, "  node [fontsize=24 fillcolor=lightskyblue style=filled color=navy]")
 	fmt.Fprintf(ofile, "  edge [fontcolor=red fontsize=30]")
 
 	for {
