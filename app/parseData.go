@@ -19,9 +19,11 @@
 package app
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -193,17 +195,28 @@ func parsePatientData(file string, nofCohortAges int) (*trajectory.PatientMap, i
 			p.CohortAge = int(math.Floor(float64(p.YOB-minYOB) / float64(ageRange)))
 		}
 	}
-	fmt.Println("Parsed patient data.")
-	fmt.Print("Parsed ", patientMap.Ctr, " patients with year of birth known ")
-	fmt.Print("of which ", patientMap.FemaleCtr, " females and ")
-	fmt.Println(patientMap.MaleCtr, "males; and of which ", deathCr, " have a known date of death.")
-	fmt.Println("Year of birth oldest patient:", minYOB)
-	fmt.Println("Year of birth youngest patient:", maxYOB)
-	fmt.Println("Patients are of ", len(regions), " regions: ")
+
+	var buffer bytes.Buffer
 	for region, nr := range regions {
-		fmt.Print(region, ": ", nr, ", ")
+		buffer.WriteString(fmt.Sprintf("[%s: %d] ", region, nr))
 	}
-	fmt.Println("")
+	slog.Info("Parsed patient data",
+		slog.Int("#regions", len(regions)),
+	)
+	slog.Debug("Parsed patient data",
+		slog.String("Regions", buffer.String()),
+	)
+	slog.Info("Parsed patients with year of birth known",
+		slog.Int("N", patientMap.Ctr),
+		slog.Int("females", patientMap.FemaleCtr),
+		slog.Int("males", patientMap.MaleCtr),
+		slog.Int("#deaths", deathCr),
+	)
+	slog.Info("Year of birth",
+		slog.Int("oldest", minYOB),
+		slog.Int("youngest", maxYOB),
+	)
+
 	return patientMap, len(regions)
 }
 
@@ -291,9 +304,11 @@ func parsePatientDiagnoses(diagnosesFile string, patients *trajectory.PatientMap
 		trajectory.SortDiagnoses(patient)
 		trajectory.CompactDiagnoses(patient)
 	}
-	fmt.Println("Parsed diagnosis data.")
-	fmt.Print("Parsed ", ctr, " diagnoses ")
-	fmt.Println("and of which ", EOICtr, " events of interest.")
+	slog.Info("Parsed diagnosis data",
+		slog.Int("diagnoses", ctr),
+		slog.Int("excluded", ctrExcl),
+		slog.Int("events-of-interest", EOICtr),
+	)
 }
 
 func (maps *icd10AnalysisMapsFromXML) extendWithATC(file string) {
@@ -348,7 +363,7 @@ func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile, actFile stri
 	parsePatientDiagnoses(diagnosisFile, patients, analysisMaps, eoid)
 	// Apply patient filter
 	patients = trajectory.ApplyPatientFilters(filters, patients)
-	fmt.Println("Filtered down to: ", len(patients.PIDMap), " patients.")
+	slog.Info("Filtered down to", slog.Int("patients", len(patients.PIDMap)))
 	// create cohorts
 	cohorts := trajectory.InitializeCohorts(patients, nofCohortAges, nofRegions, nofDiagnosisCodes)
 	mergedCohort := trajectory.MergeCohorts(cohorts)

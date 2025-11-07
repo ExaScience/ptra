@@ -20,6 +20,7 @@ package ptra_test
 
 import (
 	"fmt"
+	"log/slog"
 	"ptra/app"
 	"ptra/trajectory"
 	"testing"
@@ -71,24 +72,24 @@ func TestInitializeCohorts(t *testing.T) {
 	for _, cohort := range cohorts {
 		trajectory.PrintCohort(cohort, 18)
 	}
-	fmt.Println("Map DID -> Medical Name")
+	slog.Info("Map DID -> Medical Name")
 	collected := make([][]string, len(analysisMaps.NameMap))
 	for k, v := range analysisMaps.NameMap {
 		collected[k] = append(collected[k], v)
 	}
 	for _, v := range collected {
-		fmt.Println(v)
+		slog.Info(fmt.Sprint(v))
 		if len(v) > 1 {
-			fmt.Println("foo")
+			slog.Info("foo")
 		}
 	}
-	fmt.Println("Map Medical Name -> DID")
+	slog.Info("Map Medical Name -> DID")
 	collected2 := make([][]string, len(analysisMaps.NameMap))
 	for k, v := range analysisMaps.DIDMap {
 		collected2[v] = append(collected2[v], k)
 	}
 	for i, v := range collected2 {
-		fmt.Println(collected[i], " : ", v)
+		slog.Debug(fmt.Sprint(collected[i]) + " : " + fmt.Sprint(v))
 	}
 }
 
@@ -101,7 +102,7 @@ func TestParseTrinetXPatientDiagnoses(t *testing.T) {
 	level := 0
 	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 	app.ParseTrinetXPatientDiagnoses(file2, "", patients, analysisMaps, map[string]string{})
-	fmt.Println("First 5 patients: ")
+	slog.Info("First 5 patients: ")
 	ctr := 0
 	for _, patient := range patients.PIDMap {
 		if ctr == 5 {
@@ -109,12 +110,13 @@ func TestParseTrinetXPatientDiagnoses(t *testing.T) {
 		}
 		if len(patient.Diagnoses) > 0 {
 			ctr++
-			fmt.Println(patient)
+			slog.Info(fmt.Sprint(patient))
 		}
 	}
 }
 
 func TestInitCohortsWithFakePatients(t *testing.T) {
+	// number of fake patients to generate:
 	n := 100
 	patients := []*trajectory.Patient{}
 	for i := 0; i < n; i++ {
@@ -236,7 +238,7 @@ func TestInitCohortsWithFakePatients(t *testing.T) {
 		FemaleCtr:    0,
 	}
 	cohorts := trajectory.InitializeCohorts(PMap, 2, 1, 4)
-	fmt.Println("Printing cohorts")
+	slog.Info("Printing cohorts")
 	for _, cohort := range cohorts {
 		trajectory.PrintCohort(cohort, 4)
 	}
@@ -258,14 +260,19 @@ func TestInitCohortsWithFakePatients(t *testing.T) {
 	}
 	//initializeExperimentRelativeRiskRatios(exp, 0.5, 5.0)
 	trajectory.InitializeExperimentRelativeRiskRatios(exp, 0.5, 5.0, 10)
-	fmt.Println("Relative risk ratios: [")
-	for _, rr := range exp.DxDRR {
-		fmt.Print(rr, ", ")
+	slog.Info("Relative risk ratios: [")
+	for d, rr := range exp.DxDRR {
+		slog.Info("\t",
+			slog.Int("d", d),
+			slog.String("rrr", fmt.Sprint(rr)))
 	}
-	fmt.Println("...]")
+	slog.Info("...]")
 	trajectories := trajectory.BuildTrajectories(exp, 5, 3, 2, 1, 5,
 		1.0, []trajectory.TrajectoryFilter{})
-	fmt.Println("Collected ", len(trajectories), " trajectories.")
+
+	slog.Info("Collected Trajectories",
+		slog.Int("N", len(trajectories)))
+
 	for _, traj := range trajectories {
 		trajectory.PrintTrajectory(traj, exp)
 	}
