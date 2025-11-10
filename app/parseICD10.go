@@ -219,7 +219,8 @@ func CheckIcd10HierarchyXMLFile(file string) string {
 	if whoHierarchy.XmlName.Local == "Class" {
 		return "who"
 	}
-	fmt.Println(whoHierarchy)
+	slog.Warn("Unknown WHO-ICD10",
+		slog.String("hierarchy", fmt.Sprintf("%s", whoHierarchy)))
 	return "unknown"
 }
 
@@ -496,11 +497,11 @@ func initializeIcd10ToCCSRMap(file string) map[string]ccsrCategory {
 
 // printIcd10ToCSSRTable is a simple function to print the map from iCD10 code to ccsr category. Useful for debugging.
 func printIcd10ToCCSRTable(tab map[string]ccsrCategory) {
-	fmt.Println("ICD10 to CCSR table")
+	slog.Info("ICD10 to CCSR table")
 	ctr := 0
 	for icd10Code, ccsr := range tab {
 		ctr++
-		fmt.Println(icd10Code, " : ", ccsr.categories)
+		slog.Debug("%s : %s", icd10Code, ccsr.categories)
 		if ctr >= 1000 {
 			return
 		}
