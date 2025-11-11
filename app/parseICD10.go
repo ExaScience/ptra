@@ -220,7 +220,7 @@ func CheckIcd10HierarchyXMLFile(file string) string {
 		return "who"
 	}
 	slog.Warn("Unknown WHO-ICD10",
-		slog.String("hierarchy", fmt.Sprintf("%s", whoHierarchy)))
+		slog.String("hierarchy", fmt.Sprint(whoHierarchy)))
 	return "unknown"
 }
 

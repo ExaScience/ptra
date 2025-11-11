@@ -110,7 +110,7 @@ func TestParseTrinetXPatientDiagnoses(t *testing.T) {
 		}
 		if len(patient.Diagnoses) > 0 {
 			ctr++
-			slog.Info(fmt.Sprint(patient))
+			slog.Info("  " + fmt.Sprint(patient))
 		}
 	}
 }

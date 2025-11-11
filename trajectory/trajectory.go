@@ -690,7 +690,7 @@ func toString(arr []int, max int) string {
 
 // PrintCohort prints a cohort to standard output.
 func PrintCohort(cohort *Cohort, max int) {
-	slog.Info("Cohort:",
+	slog.Info("   Cohort:",
 		slog.Int("Age-group", cohort.AgeGroup),
 		slog.Int("Sex", cohort.Sex),
 		slog.Int("Region", cohort.Region),
