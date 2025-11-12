@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -112,11 +113,11 @@ func convertTrajectoryPairsToAbcFormat(exp *trajectory.Experiment, name string) 
 }
 
 func ClusterTrajectories(exp *trajectory.Experiment, granularities []int, path, pathToMcl string) {
-	fmt.Println("Clustering trajectories with MCL")
+	slog.Info("Clustering trajectories with MCL")
 	// convert trajectories to abc format for the mcl tool
 	dirName := fmt.Sprintf("%s-clusters/", exp.Name)
 	workingDir := filepath.Join(path, dirName) + string(filepath.Separator)
-	fmt.Println("Working path becomes: ", workingDir)
+	slog.Info("Working path becomes: " + workingDir)
 	derr := os.MkdirAll(workingDir, 0777)
 	if derr != nil {
 		panic(derr)
@@ -137,7 +138,7 @@ func ClusterTrajectories(exp *trajectory.Experiment, granularities []int, path, 
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Output: ", out.String(), serr.String())
+	slog.Info("Output: " + out.String() + serr.String())
 	// run the clusterings with different granularities
 	for _, gran := range granularities {
 		mcl_cmd := fmt.Sprintf("%smcl", pathToMcl)
@@ -146,7 +147,7 @@ func ClusterTrajectories(exp *trajectory.Experiment, granularities []int, path, 
 		var serr2 bytes.Buffer
 		cmd.Stdout = &out2
 		cmd.Stderr = &serr2
-		fmt.Println("Output: ", out2.String(), serr2.String())
+		slog.Info("Output: " + out2.String() + serr2.String())
 		err := cmd.Run()
 		if err != nil {
 			panic(err)
@@ -157,14 +158,15 @@ func ClusterTrajectories(exp *trajectory.Experiment, granularities []int, path, 
 	outFileName := fmt.Sprintf("dump.%s.mci", exp.Name)
 	mcxdumpCmd := fmt.Sprintf("%smcxdump", pathToMcl)
 	for _, gran := range granularities {
+		fullcmd := fmt.Sprint(mcxdumpCmd, "-icl", fmt.Sprintf("%s.I%d", clusterFileName, gran), "-tabr", tabFileName, "-o", fmt.Sprintf("%s.I%d", outFileName, gran))
+		slog.Info(fullcmd)
 		cmd := exec.Command(mcxdumpCmd, "-icl", fmt.Sprintf("%s.I%d", clusterFileName, gran), "-tabr", tabFileName, "-o", fmt.Sprintf("%s.I%d", outFileName, gran))
-		fmt.Println(mcxdumpCmd, "-icl", fmt.Sprintf("%s.I%d", clusterFileName, gran), "-tabr", tabFileName, "-o", fmt.Sprintf("%s.I%d", outFileName, gran))
 		var out1 bytes.Buffer
 		var serr1 bytes.Buffer
 		cmd.Stdout = &out1
 		cmd.Stderr = &serr1
 		err := cmd.Run()
-		fmt.Println("Output: ", out1.String(), serr1.String())
+		slog.Info("Output: " + out1.String() + serr1.String())
 		if err != nil {
 			panic(err)
 		}
@@ -378,7 +380,10 @@ func convertToTrajectoryClusterGraphs(exp *trajectory.Experiment, input, output 
 		}
 		fmt.Fprintf(ofile, "]\n")
 	}
-	fmt.Println("For ", output)
-	fmt.Println("Collected ", nofClusters, " clusters and ", len(trajectories), " not clustered trajectories.")
-	fmt.Println("Clustered ", len(exp.Trajectories)-len(trajectories), " out of ", len(exp.Trajectories), " trajectories.")
+	slog.Info("For "+output,
+		slog.Int("Clusters", nofClusters),
+		slog.Int("Traj-Clustered", len(exp.Trajectories)-len(trajectories)),
+		slog.Int("Traj-Not-clustered", len(trajectories)),
+		slog.Int("Traj-Total", len(exp.Trajectories)),
+	)
 }
