@@ -336,6 +336,10 @@ The `ptra` command requires four arguments:
        Example:
 
        ![image_cluster.png](image_cluster.png)
+   4. a DOT (.dot) file as alternative to the .gml files. DOT files can be visualised using [graphviz](https://graphviz.org/). 
+      E.g. using the command:
+      ```dot -T png exp1.mci.I40.trajectories.RR.dot -o clusters.png```
+      
 
 ### Optional flags
 
