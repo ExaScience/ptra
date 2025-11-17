@@ -20,7 +20,9 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"log"
+	"log/slog"
 	"ptra/app"
 	"ptra/cluster"
 	"ptra/trajectory"
@@ -31,7 +33,6 @@ import (
 	//"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 
 	//"log"
@@ -109,6 +110,8 @@ The flags are:
     E.g. cat:neoplasm only outputs trajectories where there is at least one diagnosis related to cancer. cat:bc only
 	outputs trajectories where at least one diagnosis is related to bladder cancer. The code: tag can be used to list
 	a number of ICD10 codes of which at least one should occur in the trajectory.
+--loglvl
+	Specify the log level (error, warning, info, debug, all).
 */
 
 const (
@@ -140,7 +143,8 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--pfilters age+:nr,age-:nr,sex:[male | female],control:[yes | no] ]\n" +
 	"[--tfilters cat:[neoplasms | bc],code:icd10;...;icd10]\n" +
 	"[--nrOfThreads nr]\n" +
-	"[--actFile file]\n"
+	"[--actFile file]\n" +
+	"[--loglvl error | warning | info | debug | all]\n"
 
 func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
 	if len(os.Args) < requiredArgs {
@@ -148,7 +152,7 @@ func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
 		fmt.Fprint(os.Stderr, help)
 		os.Exit(1)
 	}
-	flags.SetOutput(ioutil.Discard)
+	flags.SetOutput(io.Discard)
 	if err := flags.Parse(os.Args[requiredArgs:]); err != nil {
 		x := 0
 		if err != flag.ErrHelp {
@@ -312,6 +316,7 @@ func main() {
 		nrOfThreads          int
 		eoid                 string
 		actFile              string
+		loglvl               string
 	)
 	var flags flag.FlagSet
 	// options for the ptra command
@@ -353,15 +358,27 @@ func main() {
 	flags.StringVar(&tfilters, "tfilters", "id", "A list of filters to restrict output of trajectories."+
 		"A list of options of the form \"code:icd;icd;icd\" or \"cat:[neoplasm | bc]\"")
 	flags.StringVar(&actFile, "actFile", "", "A files with ACT codes")
+	flags.StringVar(&loglvl, "loglvl", "info", "Specify the log level (error, warning, info, debug, all).")
 	// parse optional arguments
 	parseFlags(flags, 5, ptraHelp)
+	// configure logger level from CLI
+	var logLevel slog.LevelVar
+	var logerr = logLevel.UnmarshalText([]byte(loglvl))
+	if logerr != nil {
+		panic(logerr)
+	}
+	slog.SetLogLoggerLevel(logLevel.Level())
+	slog.Debug("LOGGER::",
+		slog.String("loglvl", loglvl),
+		slog.String("level", logLevel.String()),
+	)
 	// parse required arguments
 	patientInfo = getFileName(os.Args[1], ptraHelp)
 	diagnosisInfo = getFileName(os.Args[2], ptraHelp)
 	patientDiagnoses = getFileName(os.Args[3], ptraHelp)
 	outputPath, _ = filepath.Abs(getFileName(os.Args[4], ptraHelp))
 	outputPath = outputPath + string(filepath.Separator)
-	fmt.Println("Output path: ", outputPath)
+	slog.Info("Output", slog.String("path", outputPath))
 	// create output directory
 	err := os.MkdirAll(filepath.Dir(outputPath), 0700)
 	if err != nil {
@@ -404,6 +421,7 @@ func main() {
 	if actFile != "" {
 		fmt.Fprint(&command, " --actFile ", actFile)
 	}
+	fmt.Fprint(&command, " --loglvl ", loglvl)
 	// start execution
 	log.Println(programMessage())
 	log.Println("Executing command:\n", command.String())
@@ -429,7 +447,7 @@ func main() {
 		getTrajectoryFilters(tfilters, exp))
 	//4. Plot trajectories to file
 	trajectory.PrintTrajectoriesToFile(exp, outputPath)
-	fmt.Println("Collected trajectories: ")
+	slog.Info("Collected trajectories")
 	for i := 0; i < utils.MinInt(len(exp.Trajectories), 100); i++ {
 		trajectory.PrintTrajectory(exp.Trajectories[i], exp)
 	}
@@ -440,7 +458,7 @@ func main() {
 			gi, _ := strconv.ParseInt(g, 10, 0)
 			clusterGranularityList = append(clusterGranularityList, int(gi))
 		}
-		fmt.Println("MCL Clustering:")
+		slog.Info("MCL Clustering")
 		//ClusterTrajectories(exp, clusterGranularityList, outputPath, mclPath)
 		cluster.ClusterTrajectoriesDirectly(exp, clusterGranularityList, outputPath, mclPath)
 	}

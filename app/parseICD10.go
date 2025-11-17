@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log/slog"
 	"os"
 	"ptra/trajectory"
 	"slices"
@@ -38,14 +38,14 @@ import (
 // CDC ICD10 hierarchy
 // parseIcd10HierarchyFromXML parses the xml file with the ICD10 hierarchy into an icd10Hierarchy object.
 func parseIcd10HierarchyFromXml(file string) icd10Hierarchy {
-	fmt.Println("Parsing ICD10 code hierarchy from XML file: ", file)
+	slog.Info("Parsing ICD10 code hierarchy from XML", slog.String("file", file))
 	//open file
 	xmlFile, err := os.Open(file)
 	if err != nil {
 		panic(err)
 	}
 	defer xmlFile.Close()
-	xmlFileBytes, _ := ioutil.ReadAll(xmlFile)
+	xmlFileBytes, _ := io.ReadAll(xmlFile)
 	//unmarshall
 	icd10Hierarchy := icd10Hierarchy{}
 	xml.Unmarshal(xmlFileBytes, &icd10Hierarchy)
@@ -54,57 +54,63 @@ func parseIcd10HierarchyFromXml(file string) icd10Hierarchy {
 
 // printIcd10Hierarchy prints an ICD10 hierarchy parsed from an XML file.
 func printIcd10Hierarchy(hierarchy icd10Hierarchy) {
-	fmt.Println("Printing ICD10 code hierarchy.")
+	slog.Info("Printing ICD10 code hierarchy.")
 	// count # DID per level
 	ctr1, ctr2, ctr3, ctr4, ctr5, ctr6, ctr7 := 0, 0, 0, 0, 0, 0, 0
 	for _, chap := range hierarchy.Chapters {
 		// level 1
 		ctr1++
-		fmt.Println("Chapter: ", chap.Desc)
+		slog.Info("\tChapter: " + chap.Desc)
 		for _, section := range chap.Sections {
 			// level 2
 			ctr2++
-			fmt.Println("Section: ", section.Desc)
+			slog.Debug("\t\tSection: " + section.Desc)
 			for _, diag := range section.Diagnoses {
 				// level 3
 				ctr3++
-				fmt.Println(diag.Name, " : ", diag.Desc)
+				slog.Debug("\t\t\t" + diag.Name + " : " + diag.Desc)
 				if len(diag.Diagnoses) == 0 {
 					continue
 				}
 				for _, diag := range diag.Diagnoses {
 					// level 4
 					ctr4++
-					fmt.Println(diag.Name, " : ", diag.Desc)
+					slog.Debug("\t\t\t" + diag.Name + " : " + diag.Desc)
 					if len(diag.Diagnoses) == 0 {
 						continue
 					}
 					for _, diag := range diag.Diagnoses {
 						// level 5
 						ctr5++
-						fmt.Println(diag.Name, " : ", diag.Desc)
+						slog.Debug("\t\t\t" + diag.Name + " : " + diag.Desc)
 						if len(diag.Diagnoses) == 0 {
 							continue
 						}
 						for _, diag := range diag.Diagnoses {
 							// level 6
 							ctr6++
-							fmt.Println(diag.Name, " : ", diag.Desc)
+							slog.Debug("\t\t\t" + diag.Name + " : " + diag.Desc)
 							if len(diag.Diagnoses) == 0 {
 								continue
 							}
 							// level 7
 							ctr7++
-							fmt.Println(diag.Name, " : ", diag.Desc)
+							slog.Debug("\t\t\t" + diag.Name + " : " + diag.Desc)
 						}
 					}
 				}
 			}
 		}
 	}
-	fmt.Println("#ICD10 codes/descriptors per level: ")
-	fmt.Println("Lvl 0: ", ctr1, " Lvl 1: ", ctr2, " Lvl 2: ",
-		ctr3, " Lvl 3: ", ctr4, " Lvl 4: ", ctr5, " Lvl 5: ", ctr6, " Lvl 6: ", ctr7)
+	slog.Info("#ICD10 codes/descriptors per level:",
+		slog.Int("Lvl-1", ctr1),
+		slog.Int("Lvl-2", ctr2),
+		slog.Int("Lvl-3", ctr3),
+		slog.Int("Lvl-4", ctr4),
+		slog.Int("Lvl-5", ctr5),
+		slog.Int("Lvl-6", ctr6),
+		slog.Int("Lvl-7", ctr7),
+	)
 }
 
 type cdcICD10HierarchyXML struct {
@@ -179,14 +185,14 @@ type whoICD10HierarchyXML struct {
 }
 
 func ParseWhoIcd10HierarchyFromXml(file string) whoIcd10Hierarchy {
-	fmt.Println("Parsing who ICD10 code hierarchy from XML file: ", file)
+	slog.Info("Parsing who ICD10 code hierarchy from XML", slog.String("file", file))
 	//open file
 	xmlFile, err := os.Open(file)
 	if err != nil {
 		panic(err)
 	}
 	defer xmlFile.Close()
-	xmlFileBytes, _ := ioutil.ReadAll(xmlFile)
+	xmlFileBytes, _ := io.ReadAll(xmlFile)
 	//unmarshall
 	whoICD10Hierarchy := whoIcd10Hierarchy{}
 	xml.Unmarshal(xmlFileBytes, &whoICD10Hierarchy)
@@ -213,7 +219,8 @@ func CheckIcd10HierarchyXMLFile(file string) string {
 	if whoHierarchy.XmlName.Local == "Class" {
 		return "who"
 	}
-	fmt.Println(whoHierarchy)
+	slog.Warn("Unknown WHO-ICD10",
+		slog.String("hierarchy", fmt.Sprint(whoHierarchy)))
 	return "unknown"
 }
 
@@ -238,9 +245,9 @@ func selectParentCategory(name icd10Name) string {
 }
 
 func printIcd10NameMap(table map[string]icd10Name) {
-	fmt.Println("ICD10 Name map: ")
+	slog.Info("ICD10 Name map: ")
 	for id, name := range table {
-		fmt.Println(id, " : ", name)
+		slog.Debug("%s : %s", id, name)
 	}
 }
 
@@ -413,7 +420,10 @@ func intializeIcd10AnalysisMaps(icd10NameMap map[string]icd10Name, level int,
 		analysisIdMap[code] = ctr
 		ctr++
 	}
-	fmt.Println("Mapped ", len(icd10NameMap), " ICD10 codes to ", ctr, " analysis IDs of level ", level)
+	slog.Info("Mapped ICD10 codes",
+		slog.Int("N", len(icd10NameMap)),
+		slog.Int("level", level),
+		slog.Int("analysis-IDs", ctr))
 	return analysisIdMap, analysisNameMap, ctr
 }
 
@@ -487,11 +497,11 @@ func initializeIcd10ToCCSRMap(file string) map[string]ccsrCategory {
 
 // printIcd10ToCSSRTable is a simple function to print the map from iCD10 code to ccsr category. Useful for debugging.
 func printIcd10ToCCSRTable(tab map[string]ccsrCategory) {
-	fmt.Println("ICD10 to CCSR table")
+	slog.Info("ICD10 to CCSR table")
 	ctr := 0
 	for icd10Code, ccsr := range tab {
 		ctr++
-		fmt.Println(icd10Code, " : ", ccsr.categories)
+		slog.Debug("%s : %s", icd10Code, ccsr.categories)
 		if ctr >= 1000 {
 			return
 		}
@@ -532,7 +542,9 @@ func initializeIcd10AnalysisMapsCCSR(icd10ToCssrMap map[string]ccsrCategory,
 		analysisIdMap[code] = []int{ctr}
 		ctr++
 	}
-	fmt.Println("Mapped ", len(icd10ToCssrMap), " ICD10 codes to ", ctr, " analysis IDs")
+	slog.Info("Mapped ICD10 codes",
+		slog.Int("N", len(icd10ToCssrMap)),
+		slog.Int("analysis-IDs", ctr))
 	return analysisIdMap, analysisNameMap, ctr
 }
 

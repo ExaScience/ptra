@@ -19,11 +19,12 @@
 package app
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -170,17 +171,28 @@ func parseTriNetXPatientData(file string, nofCohortAges int) (*trajectory.Patien
 			p.CohortAge = int(math.Floor(float64(p.YOB-minYOB) / float64(ageRange)))
 		}
 	}
-	fmt.Println("Parsed patient data.")
-	fmt.Print("Parsed ", patientMap.Ctr, " patients with year of birth known ")
-	fmt.Print("of which ", patientMap.FemaleCtr, " females and ")
-	fmt.Println(patientMap.MaleCtr, "males; and of which ", deathCr, " have a known date of death.")
-	fmt.Println("Year of birth oldest patient:", minYOB)
-	fmt.Println("Year of birth youngest patient:", maxYOB)
-	fmt.Println("Patients are of ", len(regions), " regions: ")
+
+	var buffer bytes.Buffer
 	for region, nr := range regions {
-		fmt.Print(region, ": ", nr, ", ")
+		buffer.WriteString(fmt.Sprintf("[%s: %d] ", region, nr))
 	}
-	fmt.Println("")
+	slog.Info("Parsed patient data",
+		slog.Int("#regions", len(regions)),
+	)
+	slog.Debug("Parsed patient data",
+		slog.String("Regions", buffer.String()),
+	)
+	slog.Info("Parsed patients with year of birth known",
+		slog.Int("N", patientMap.Ctr),
+		slog.Int("females", patientMap.FemaleCtr),
+		slog.Int("males", patientMap.MaleCtr),
+		slog.Int("#deaths", deathCr),
+	)
+	slog.Info("Year of birth",
+		slog.Int("oldest", minYOB),
+		slog.Int("youngest", maxYOB),
+	)
+
 	return patientMap, len(regions)
 }
 
@@ -330,11 +342,15 @@ func parseTrinetXPatientDiagnoses(diagnosesFile, treatmentInfoFile string, patie
 		trajectory.SortDiagnoses(patient)
 		trajectory.CompactDiagnoses(patient)
 	}
-	fmt.Println("Parsed diagnosis data.")
-	fmt.Print("Parsed ", ctr, " diagnoses ")
-	fmt.Println("of which ", ctrID09, " ICD09 diagnoses and ", ctr-ctrID09, " ICD10 diagnoses, and ", ctrExcl, " diagnoses excluded from analysis")
-	fmt.Println("and of which ", EOICtr, " events of interest.")
-	fmt.Println("Parsed non ICD diagnoses for: ", nonICDCtr, " patients.")
+
+	slog.Info("Parsed diagnosis data",
+		slog.Int("diagnoses", ctr),
+		slog.Int("ICD09", ctrID09),
+		slog.Int("ICD10", ctr-ctrID09),
+		slog.Int("excluded", ctrExcl),
+		slog.Int("events-of-interest", EOICtr),
+		slog.Int("non-ICD", nonICDCtr),
+	)
 }
 
 func ParseTriNetXData(name, patientFile, diagnosisFile, diagnosisInfoFile, treatmentInfoFile string, nofCohortAges,
@@ -369,7 +385,7 @@ func ParseTriNetXData(name, patientFile, diagnosisFile, diagnosisInfoFile, treat
 	parseTrinetXPatientDiagnoses(diagnosisFile, treatmentInfoFile, patients, analysisMaps, icd9ToIcd10Map)
 	// Apply patient filter
 	patients = trajectory.ApplyPatientFilters(filters, patients)
-	fmt.Println("Filtered down to: ", len(patients.PIDMap), " patients.")
+	slog.Info("Filtered down to", slog.Int("patients", len(patients.PIDMap)))
 	// create cohorts
 	cohorts := trajectory.InitializeCohorts(patients, nofCohortAges, nofRegions, nofDiagnosisCodes)
 	mergedCohort := trajectory.MergeCohorts(cohorts)
@@ -399,8 +415,8 @@ func parseIcd9ToIcd10Mapping(file string) map[string]string {
 		panic(err)
 	}
 	defer jsonFile.Close()
-	fmt.Println("Parsing ICD9 to ICD10 mapping from a json file.")
-	jsonBytes, _ := ioutil.ReadAll(jsonFile)
+	slog.Info("Parsing ICD9 to ICD10 mapping from a json file.")
+	jsonBytes, _ := io.ReadAll(jsonFile)
 	var mapping map[string]string
 	json.Unmarshal(jsonBytes, &mapping)
 	return mapping
@@ -515,7 +531,7 @@ func ParsetTriNetXTumorData(fileName string) map[string][]*TumorInfo {
 }
 
 func printTumorInfoSummary(tumorInfo map[string][]*TumorInfo) {
-	fmt.Println("Parsed tumor info. Found tumor info for: ", len(tumorInfo), " patients.")
+	slog.Info("Parsed tumor info. Found info for", slog.Int("patients", len(tumorInfo)))
 	ctr := map[string]int{}
 	for _, tumors := range tumorInfo {
 		for _, tumor := range tumors {
@@ -530,16 +546,24 @@ func printTumorInfoSummary(tumorInfo map[string][]*TumorInfo) {
 	}
 	sort.Strings(stages)
 	for _, stage := range stages {
-		fmt.Println("For stage: ", stage, ": ", ctr[stage], " entries.")
+		slog.Debug("tumor info",
+			slog.String("stage", stage),
+			slog.Int("entries", ctr[stage]),
+		)
 	}
 }
 
 func printTumorInfo(tumorInfo map[int][]*TumorInfo) {
-	fmt.Println("Nr of patients with tumor info: ", len(tumorInfo))
+	slog.Info("Tumor Info", slog.Int("#patients", len(tumorInfo)))
 	for pid, infos := range tumorInfo {
 		for _, info := range infos {
-			fmt.Println("Patient with pid: ", pid, " has TStage: ", info.TStage, " NStage: ", info.NStage, " MStage: ",
-				info.MStage, " Global stage: ", info.Stage)
+			slog.Debug("  Patient",
+				slog.Int("pid", pid),
+				slog.String("TStage", info.TStage),
+				slog.String("NStage", info.NStage),
+				slog.String("MStage", info.MStage),
+				slog.String("Global", info.Stage),
+			)
 		}
 	}
 }

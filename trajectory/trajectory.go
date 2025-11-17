@@ -21,9 +21,8 @@ package trajectory
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/exascience/pargo/parallel"
-	"github.com/valyala/fastrand"
 	"io"
+	"log/slog"
 	"math"
 	"math/rand"
 	"os"
@@ -32,6 +31,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/exascience/pargo/parallel"
+	"github.com/valyala/fastrand"
 )
 
 const (
@@ -275,13 +277,17 @@ func makeCohorts(nofAgeGroups, nofRegions, nofDiagnoses int) []*Cohort {
 
 // InitializeCohorts creates cohorts + initializes them with the counts for each diagnosis + patients per diagnosis
 func InitializeCohorts(patients *PatientMap, nofAgegroups, nofRegions, nofDiagnosisCodes int) []*Cohort {
-	fmt.Println("Initializing cohorts: with ", len(patients.PIDMap), " patients (Males: ", patients.MaleCtr, ""+
-		"Females: ", patients.FemaleCtr, ") "+
-		" nr of diagnosis codes: ", nofDiagnosisCodes, "nr of age groups: ", nofAgegroups)
-	fmt.Println("Making cohort vectors...")
+	slog.Info("Initializing cohorts",
+		slog.Int("patients", len(patients.PIDMap)),
+		slog.Int("males", patients.MaleCtr),
+		slog.Int("females", patients.FemaleCtr),
+		slog.Int("diagnosis-codes", nofDiagnosisCodes),
+		slog.Int("age-groups", nofAgegroups),
+	)
+	slog.Info("Making cohort vectors...")
 	cohorts := makeCohorts(nofAgegroups, nofRegions, nofDiagnosisCodes)
 	// count occurence of diagnoses, collect patients in the cohort
-	fmt.Println("Counting diagnosis occurrences...")
+	slog.Info("Counting diagnosis occurrences...")
 	for _, patient := range patients.PIDMap {
 		diagnoses := patient.Diagnoses
 		cohort := selectCohort(cohorts, nofAgegroups, nofRegions, patient.Sex, patient.CohortAge, patient.Region)
@@ -440,8 +446,9 @@ func patientsToIdMap(patients []*Patient) map[int]bool {
 // within 0.05 of the true p-values and with iter = 10000 they are within 0.01 of the true p-values.
 // The relative risk ratios are calculated in parallel for all possible diagnosis pairs.
 func InitializeExperimentRelativeRiskRatios(exp *Experiment, minTime, maxTime float64, iter int) {
-	fmt.Println("Initializing relative risk ratios...")
-	fmt.Println("Sampling ", iter, " comparison groups for each diagnosis pair...")
+	slog.Info("Initializing relative risk ratios...")
+	slog.Info("Sampling comparison groups for each diagnosis pair",
+		slog.Int("N", iter))
 	// init random nr generator
 	rand.Seed(time.Now().UnixNano())
 	indexVector := []int{}
@@ -665,21 +672,32 @@ func MergeCohorts(cohorts []*Cohort) *Cohort {
 			}
 		}
 	}
-	fmt.Println("Merged cohort")
+	slog.Info("Merged cohort")
 	PrintCohort(cohort1, utils.MinInt(len(cohort1.DCtr), 22))
 	return cohort1
 }
 
+// convert an array of int into a string, comma-separated values, print up to "max" values
+func toString(arr []int, max int) string {
+	return strings.Join(
+		strings.Split(
+			strings.Replace(
+				fmt.Sprint(arr[:max]),
+				"]", " ...]", 1),
+			" "),
+		", ")
+}
+
 // PrintCohort prints a cohort to standard output.
 func PrintCohort(cohort *Cohort, max int) {
-	fmt.Println("Cohort: ")
-	fmt.Println("Age group: ", cohort.AgeGroup, " Sex: ", cohort.Sex, " Region: ", cohort.Region, " Nr of patients: ", cohort.NofPatients, " "+
-		"Nr of diagnoses: ", cohort.NofDiagnoses)
-	fmt.Println("DCtr: [")
-	for i := 0; i < max; i++ {
-		fmt.Print(cohort.DCtr[i], ", ")
-	}
-	fmt.Println("...]")
+	slog.Info("   Cohort:",
+		slog.Int("Age-group", cohort.AgeGroup),
+		slog.Int("Sex", cohort.Sex),
+		slog.Int("Region", cohort.Region),
+		slog.Int("#patients", cohort.NofPatients),
+		slog.Int("#diagnoses", cohort.NofDiagnoses),
+		slog.String("DCtr", toString(cohort.DCtr, max)),
+	)
 }
 
 // Pair is a struct for representing a diagnosis pair. It simply stores two diagnosis codes.
@@ -690,7 +708,7 @@ type Pair struct {
 // selectDiagnosisPairs selects diagnosis pairs from which to calculate trajectories. These pairs are constrained by
 // requiring a minimum number of patients that is diagnosed with the disease pair, and a minimum RR score.
 func selectDiagnosisPairs(exp *Experiment, minPatients int, minRR float64) []*Pair {
-	fmt.Println("Selecting diagnosis pairs for building trajectories...")
+	slog.Info("Selecting diagnosis pairs for building trajectories...")
 	pairs := []*Pair{}
 	nofDiagnosisCodes := len(exp.NameMap)
 	for i := 0; i < nofDiagnosisCodes; i++ {
@@ -726,7 +744,8 @@ func selectDiagnosisPairs(exp *Experiment, minPatients int, minRR float64) []*Pa
 			}
 		}
 	}
-	fmt.Println("Found ", len(pairs), " suitable diagnosis pairs.")
+	slog.Info("Found suitable diagnosis pairs:",
+		slog.Int("N", len(pairs)))
 	return pairs
 }
 
@@ -759,7 +778,7 @@ func extendTrajectory(currentT *Trajectory, d int, minTime, maxTime float64) map
 // a list of filters.
 func BuildTrajectories(exp *Experiment, minPatients, maxLength, minLength int, minTime, maxTime, minRR float64,
 	filters []TrajectoryFilter) []*Trajectory {
-	fmt.Println("Building patient trajectories...")
+	slog.Info("Building patient trajectories...")
 	pairs := selectDiagnosisPairs(exp, minPatients, minRR)
 	exp.Pairs = pairs
 	var trajectories []*Trajectory
@@ -837,7 +856,8 @@ func BuildTrajectories(exp *Experiment, minPatients, maxLength, minLength int, m
 		return r1
 	})
 	trajectories = result.([]*Trajectory)
-	fmt.Println("Found ", len(trajectories), " trajectories.")
+	slog.Info("Found trajectories:",
+		slog.Int("N", len(trajectories)))
 	filteredTrajectories := []*Trajectory{}
 	for _, traj := range trajectories {
 		keep := true
@@ -851,8 +871,9 @@ func BuildTrajectories(exp *Experiment, minPatients, maxLength, minLength int, m
 			filteredTrajectories = append(filteredTrajectories, traj)
 		}
 	}
-	fmt.Println("Filtered down from: ", len(trajectories), " trajectories down to: ", len(filteredTrajectories),
-		" trajectories.")
+	slog.Info("Filtered down trajectories:",
+		slog.Int("from", len(trajectories)),
+		slog.Int("to", len(filteredTrajectories)))
 	exp.Trajectories = filteredTrajectories
 	return filteredTrajectories
 }

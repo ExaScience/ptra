@@ -21,6 +21,7 @@ package main
 import (
 	"bytes"
 	"log"
+	"log/slog"
 	"ptra/app"
 	"ptra/cluster"
 	"ptra/trajectory"
@@ -336,7 +337,7 @@ func main() {
 	patientDiagnoses = triNetXGetFileName(os.Args[3], triNetXPtraHelp)
 	outputPath, _ = filepath.Abs(triNetXGetFileName(os.Args[4], triNetXPtraHelp))
 	outputPath = outputPath + string(filepath.Separator)
-	fmt.Println("Output path: ", outputPath)
+	slog.Info("Output", slog.String("path", outputPath))
 	// create output directory
 	err := os.MkdirAll(filepath.Dir(outputPath), 0700)
 	if err != nil {
@@ -406,7 +407,7 @@ func main() {
 		triNetXGetTrajectoryFilters(tfilters, exp))
 	//4. Plot trajectories to file
 	trajectory.PrintTrajectoriesToFile(exp, outputPath)
-	fmt.Println("Collected trajectories: ")
+	slog.Info("Collected trajectories: ")
 	for i := 0; i < utils.MinInt(len(exp.Trajectories), 100); i++ {
 		trajectory.PrintTrajectory(exp.Trajectories[i], exp)
 	}
@@ -417,7 +418,7 @@ func main() {
 			gi, _ := strconv.ParseInt(g, 10, 0)
 			clusterGranularityList = append(clusterGranularityList, int(gi))
 		}
-		fmt.Println("MCL Clustering:")
+		slog.Info("MCL Clustering:")
 		//ClusterTrajectories(exp, clusterGranularityList, outputPath, mclPath)
 		cluster.ClusterTrajectoriesDirectly(exp, clusterGranularityList, outputPath, mclPath)
 	}

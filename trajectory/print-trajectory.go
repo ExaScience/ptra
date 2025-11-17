@@ -20,26 +20,29 @@ package trajectory
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"ptra/utils"
 	"strconv"
+	"strings"
 )
 
 // Plotting of trajectories
 
 // PrintTrajectory prints a trajectory to standard output.
 func PrintTrajectory(t *Trajectory, exp *Experiment) {
-	j := 0
+	result := []string{}
 	for i, d := range t.Diagnoses {
-		dName := exp.NameMap[d]
-		fmt.Print(dName)
-		if i != len(t.Diagnoses)-1 {
-			fmt.Print(" -- ", t.PatientNumbers[j], " --> ")
+		result = append(result, exp.NameMap[d]) // the name
+		if i < len(t.Diagnoses)-1 {
+			result = append(result,
+				fmt.Sprintf("--<%d>-->", t.PatientNumbers[i])) // the edge number
 		}
-		j++
 	}
-	fmt.Println(" ")
+	slog.Info("\t",
+		slog.String("Trajectory", strings.Join(result, " ")),
+	)
 }
 
 // printTrajectoriesToTabFile prints a human-readable representation of trajectories to a tab file. Per trajectory, it

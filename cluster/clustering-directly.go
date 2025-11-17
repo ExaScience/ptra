@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,11 +102,11 @@ func convertTrajectoriesToAbcFormat(exp *trajectory.Experiment, name string) {
 // It does a pairwise comparison of all trajectories by calculating the jaccard similarity coefficients. Subsequently,
 // MCL clustering is used to group the trajectories by jaccard similarity into clusters.
 func ClusterTrajectoriesDirectly(exp *trajectory.Experiment, granularities []int, path, pathToMcl string) {
-	fmt.Println("Clustering trajectories directly with MCL")
+	slog.Info("Clustering trajectories directly with MCL")
 	// convert trajectories to abc format for the mcl tool
 	dirName := fmt.Sprintf("%s-clusters-directly/", exp.Name)
 	workingDir := filepath.Join(path, dirName) + string(filepath.Separator)
-	fmt.Println("Working path becomes: ", workingDir)
+	slog.Info("Working path becomes: " + workingDir)
 	derr := os.MkdirAll(workingDir, 0777)
 	if derr != nil {
 		panic(derr)
@@ -126,7 +127,7 @@ func ClusterTrajectoriesDirectly(exp *trajectory.Experiment, granularities []int
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Output: ", out.String(), serr.String())
+	slog.Info("Output: " + out.String() + serr.String())
 	// run the clusterings with different granularities
 	for _, gran := range granularities {
 		mcl_cmd := fmt.Sprintf("%smcl", pathToMcl)
@@ -135,7 +136,7 @@ func ClusterTrajectoriesDirectly(exp *trajectory.Experiment, granularities []int
 		var serr2 bytes.Buffer
 		cmd.Stdout = &out2
 		cmd.Stderr = &serr2
-		fmt.Println("Output: ", out2.String(), serr2.String())
+		slog.Info("Output: " + out2.String() + serr2.String())
 		err := cmd.Run()
 		if err != nil {
 			panic(err)
@@ -147,13 +148,13 @@ func ClusterTrajectoriesDirectly(exp *trajectory.Experiment, granularities []int
 	mcxdumpCmd := fmt.Sprintf("%smcxdump", pathToMcl)
 	for _, gran := range granularities {
 		cmd := exec.Command(mcxdumpCmd, "-icl", fmt.Sprintf("%s.I%d", clusterFileName, gran), "-tabr", tabFileName, "-o", fmt.Sprintf("%s.I%d", outFileName, gran))
-		fmt.Println(mcxdumpCmd, "-icl", fmt.Sprintf("%s.I%d", clusterFileName, gran), "-tabr", tabFileName, "-o", fmt.Sprintf("%s.I%d", outFileName, gran))
+		slog.Info(fmt.Sprint(mcxdumpCmd, "-icl", fmt.Sprintf("%s.I%d", clusterFileName, gran), "-tabr", tabFileName, "-o", fmt.Sprintf("%s.I%d", outFileName, gran)))
 		var out1 bytes.Buffer
 		var serr1 bytes.Buffer
 		cmd.Stdout = &out1
 		cmd.Stderr = &serr1
 		err := cmd.Run()
-		fmt.Println("Output: ", out1.String(), serr1.String())
+		slog.Info("Output: " + out1.String() + serr1.String())
 		if err != nil {
 			panic(err)
 		}
@@ -269,8 +270,10 @@ func convertToDirectTrajectoryClusterGraphs(exp *trajectory.Experiment, input, o
 		}
 		fmt.Fprintf(ofile, "]\n")
 	}
-	fmt.Println("For ", output)
-	fmt.Println("Collected ", nofClusters, " clusters")
+	slog.Info("For "+output,
+		slog.Int("Clusters", nofClusters),
+		slog.Int("Trajectories", len(exp.Trajectories)),
+	)
 }
 
 // percentMalesFemales computes for a given list of patients the percentage of males and females wrt to the total number
@@ -412,8 +415,10 @@ func convertToDirectTrajectoryClusterGraphsRR(exp *trajectory.Experiment, input,
 		}
 		fmt.Fprintf(ofile, "]\n")
 	}
-	fmt.Println("For ", output)
-	fmt.Println("Collected ", nofClusters, " clusters")
+	slog.Info("For "+output,
+		slog.Int("Clusters", nofClusters),
+		slog.Int("Trajectories", len(exp.Trajectories)),
+	)
 }
 
 // convertToDirectTrajectoryClusterGraphsRRDot converts MCL cluster output - a file with for each cluster id a list of
@@ -510,6 +515,8 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 	// close the DOT digraph
 	fmt.Fprintf(ofile, "}\n")
 
-	fmt.Println("For ", output)
-	fmt.Println("Collected ", nofClusters, " clusters")
+	slog.Info("For "+output,
+		slog.Int("Clusters", nofClusters),
+		slog.Int("Trajectories", len(exp.Trajectories)),
+	)
 }
