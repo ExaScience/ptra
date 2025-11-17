@@ -128,9 +128,10 @@ WHO format
     ptra patientInfoFile diagnosisInfoFile diagnosesFile outputPath 
         --nofAgeGroups nr --lvl nr --minPatients nr --maxYears nr --minYears nr --maxTrajectoryLength nr
         --minTrajectoryLength nr --name string --cluster --mclPath string --iter nr --saveRR file --loadRR file
-        --pfilters [age+:nr,age-:nr,sex:[male | female]]
-        --tfilters [cat:[neoplasms|bc],code:icd10;icd10,...]
+        --pfilters age+:nr,age-:nr,sex:[male | female]
+        --tfilters cat:[neoplasms|bc],code:icd10;icd10,...
         --actFile file
+        --loglvl error | warning | info | debug | all
 ```
 ### Description
 The `ptra` command requires four arguments:
@@ -273,6 +274,14 @@ patients at the time of the event of interest.
 A file containing WHO ACT codes, mapping a unique ACT ID to description. ACT codes may be registered in a similar way as 
 diagnoses and are included as events in trajectory building.
 
+* `--loglvl error | warning | info | debug | all`
+
+An option for toggling structured logging in ptra. You can choose the following level of detail for logging:
+- info: logs general information about the ptra execution. Includes all messages from the Warn, Error, and Info levels.
+- warn: logs warning messages that indicate potential issues with the ptra execution. Includes all messages from Warn 
+and Error levels.
+- error: logs only error messages.
+- debug: most detailed logging level. Logs messages in the Debug, Info,  Warn, and Error level.
 ## TriNetX Use Case
 ### Name
 `ptra` - a commandline tool for extracting statistically relevant trajectories from ICD9/ICD10 diagnosis histories in 
