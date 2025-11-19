@@ -214,17 +214,23 @@ func printTrajectoriesToIndividualGraphsFile(exp *Experiment, name string) {
 // - A GML file with one graph reprsenting all trajectories
 // - A GML file where each trajectory is represented as an individula subgraph
 func PrintTrajectoriesToFile(exp *Experiment, path string) {
-	// print the trajectories to file
-	// create a file where all trajectories are seperate graphs
+	// print the (unclustered) trajectories to file
+	// create a file where all trajectories are separate graphs
 	// create a file where all trajectories are combined into 1 graph
 	// create a file that just has each trajectory as a tab seperated list of disease codes
-	tabFileName := filepath.Join(path, fmt.Sprintf("%s-trajectories.tab", exp.Name))
+	dirName := fmt.Sprintf("%s-unclustered-trajectories/", exp.Name)
+	outputDir := filepath.Join(path, dirName) + string(filepath.Separator)
+	derr := os.MkdirAll(outputDir, 0777)
+	if derr != nil {
+		panic(derr)
+	}
+	tabFileName := filepath.Join(outputDir, fmt.Sprintf("%s-trajectories.tab", exp.Name))
 	printTrajectoriesToTabFile(exp.Trajectories, exp.NameMap, tabFileName)
-	tabFileName2 := filepath.Join(path, fmt.Sprintf("%s-pairs.tab", exp.Name))
+	tabFileName2 := filepath.Join(outputDir, fmt.Sprintf("%s-pairs.tab", exp.Name))
 	printPairsToTabFile(exp, tabFileName2)
-	graphFileName := filepath.Join(path, fmt.Sprintf("%s-trajectories-merged-graph.gml", exp.Name))
+	graphFileName := filepath.Join(outputDir, fmt.Sprintf("%s-trajectories-merged-graph.gml", exp.Name))
 	printTrajectoriesToOneGraphFile(exp, graphFileName)
-	graphsFileName := filepath.Join(path, fmt.Sprintf("%s-trajectories-individual-graphs.gml", exp.Name))
+	graphsFileName := filepath.Join(outputDir, fmt.Sprintf("%s-trajectories-individual-graphs.gml", exp.Name))
 	printTrajectoriesToIndividualGraphsFile(exp, graphsFileName)
 }
 
