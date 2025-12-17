@@ -175,6 +175,7 @@ func ClusterTrajectoriesDirectly(exp *trajectory.Experiment, granularities []int
 		}
 		inputFileName := fmt.Sprintf("%s.I%d", outFileName, gran)
 		convertToDirectTrajectoryClusterGraphs(exp, inputFileName, fmt.Sprintf("%s%s.trajectories.gml", outPath, inputFileName))
+		convertToDirectTrajectoryClusterGraphsDot(exp, inputFileName, fmt.Sprintf("%s%s.trajectories.dot", outPath, inputFileName))
 		convertToDirectTrajectoryClusterGraphsRR(exp, inputFileName, fmt.Sprintf("%s%s.trajectories.RR.gml", outPath, inputFileName))
 		convertToDirectTrajectoryClusterGraphsRRDot(exp, inputFileName, fmt.Sprintf("%s%s.trajectories.RR.dot", outPath, inputFileName))
 		trajectory.PrintClusteredTrajectoriesToFile(exp, fmt.Sprintf("%s%s.clustered.trajectories.tab", outPath, inputFileName))
@@ -343,7 +344,7 @@ func transitionInformation(exp *trajectory.Experiment, t *trajectory.Trajectory,
 // convertToDirectTrajectoryClusterGraphsRR converts MCL cluster output - a file with for each cluster id a list of
 // trajectory ids - to a GML output file that plots the trajectories as graphs. Each cluster is plotted as a separate
 // subgraph, with diagnosis codes used as nodes and trajectory transitions used as edges. The edges are annotated with
-// the relatitive risk score (RR) associated with the diagnosis pair that the edge represents.
+// the relative risk score (RR) associated with the diagnosis pair that the edge represents.
 func convertToDirectTrajectoryClusterGraphsRR(exp *trajectory.Experiment, input, output string) {
 	file, err := os.Open(input)
 	if err != nil {
@@ -436,7 +437,7 @@ func convertToDirectTrajectoryClusterGraphsRR(exp *trajectory.Experiment, input,
 // convertToDirectTrajectoryClusterGraphsRRDot converts MCL cluster output - a file with for each cluster id a list of
 // trajectory ids - to a DOT output file that plots the trajectories as graphs using GraphViz. Each cluster is plotted
 // as a separate subgraph, with diagnosis codes used as nodes and trajectory transitions used as edges. The edges are
-// annotated with the relatitive risk score (RR) associated with the diagnosis pair that the edge represents.
+// annotated with the relative risk score (RR) associated with the diagnosis pair that the edge represents.
 func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, input, output string) {
 	file, err := os.Open(input)
 	if err != nil {
@@ -517,6 +518,108 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 					RR := strconv.FormatFloat(exp.DxDRR[d1][d2], 'f', 2, 64)
 					fmt.Fprintf(ofile,
 						fmt.Sprintf("    c%d_%d -> c%d_%d [label=\"%s\" penwidth=%s weight=%s]\n", nofClusters-1, d1, nofClusters-1, d2, RR, RR, RR))
+				}
+				d1 = d2
+				tctr++
+			}
+		}
+		fmt.Fprintf(ofile, "  }\n")
+	}
+	// close the DOT digraph
+	fmt.Fprintf(ofile, "}\n")
+
+	slog.Info("For "+output,
+		slog.Int("Clusters", nofClusters),
+		slog.Int("Trajectories", len(exp.Trajectories)),
+	)
+}
+
+// convertToDirectTrajectoryClusterGraphsRRDot converts MCL cluster output - a file with for each cluster id a list of
+// trajectory ids - to a DOT output file that plots the trajectories as graphs using GraphViz. Each cluster is plotted
+// as a separate subgraph, with diagnosis codes used as nodes and trajectory transitions used as edges. The edges are
+// annotated with the relative risk score (RR) associated with the diagnosis pair that the edge represents.
+func convertToDirectTrajectoryClusterGraphsDot(exp *trajectory.Experiment, input, output string) {
+	file, err := os.Open(input)
+	if err != nil {
+		panic(err)
+	}
+	ofile, oerr := os.Create(output)
+	if oerr != nil {
+		panic(oerr)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			panic(err)
+		}
+		if oerr := ofile.Close(); oerr != nil {
+			panic(oerr)
+		}
+	}()
+	// trajectories to assign to clusters
+	nofClusters := 0
+
+	// parse file
+	reader := csv.NewReader(file)
+	reader.Comma = '\t'
+	reader.FieldsPerRecord = -1
+	reader.LazyQuotes = true
+
+	// print dot directional-graph header, and some formatting
+	fmt.Fprintf(ofile, "digraph {\n")
+	fmt.Fprintf(ofile, "  node [fontsize=24 fillcolor=lightskyblue style=filled color=navy]")
+	fmt.Fprintf(ofile, "  edge [fontcolor=red fontsize=30]")
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			panic(err)
+		}
+		// collect codes in the cluster
+		var codes []int
+		for _, rcode := range record {
+			code, err := strconv.Atoi(rcode)
+			if err != nil {
+				panic(err)
+			}
+			codes = append(codes, code)
+		}
+		// print the trajectories in the cluster
+		collected := collectTrajectoriesFromClusterData(exp, codes, nofClusters)
+		nofClusters++
+		// print this cluster
+		// print header
+		fmt.Fprintf(ofile, fmt.Sprintf("  subgraph cluster_%d {\n", nofClusters-1))
+
+		nodePrinted := map[int]bool{}
+		// print nodes
+		for _, t := range collected {
+			for _, node := range t.Diagnoses {
+				if _, ok := nodePrinted[node]; !ok {
+					fmt.Fprintf(ofile, fmt.Sprintf("    c%d_%d [label=\"%s\"]\n", nofClusters-1, node, utils.WrapText(exp.NameMap[node], 25)))
+					nodePrinted[node] = true
+				}
+			}
+		}
+		// print edges
+		edgePrinted := make([][]bool, exp.NofDiagnosisCodes)
+		for i, _ := range edgePrinted {
+			edgePrinted[i] = make([]bool, exp.NofDiagnosisCodes)
+		}
+		for _, t := range collected {
+			d1 := t.Diagnoses[0]
+			tctr := 0
+			for i := 1; i < len(t.Diagnoses); i++ {
+				d2 := t.Diagnoses[i]
+				if !edgePrinted[d1][d2] {
+					edgePrinted[d1][d2] = true
+					v := float64(t.PatientNumbers[i-1]) / 10.0
+					n := strconv.FormatInt(int64(t.PatientNumbers[i-1]), 10)
+					ns := strconv.FormatFloat(v, 'f', 2, 64)
+					fmt.Fprintf(ofile,
+						fmt.Sprintf("    c%d_%d -> c%d_%d [label=\"%s\" penwidth=%s weight=%s]\n", nofClusters-1, d1, nofClusters-1, d2, n, ns, ns))
 				}
 				d1 = d2
 				tctr++
