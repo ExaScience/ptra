@@ -182,6 +182,9 @@ func ClusterTrajectoriesDirectly(exp *trajectory.Experiment, granularities []int
 		trajectory.PrintClustersToCSVFiles(exp, fmt.Sprintf("%s%s.clustered.patients.csv", outPath, inputFileName),
 			fmt.Sprintf("%s%s.clustered.clusters.csv", outPath, inputFileName))
 	}
+	mout := fmt.Sprintf("%s.ext.mod.scores", exp.Name)
+	moutpath := filepath.Join(workingDir, mout)
+	computeAndPlotExtendedModularityScores(exp, granularities, moutpath)
 }
 
 // collectTrajectoriesFromClusterData looks up trajectories associated with a given list of trajectory ids and assigns
@@ -844,4 +847,47 @@ func ParseMCLGraph(exp *trajectory.Experiment, graph string) clusterGraph {
 		nofClusters++
 	}
 	return mclGraph
+}
+
+// computeAndPlotExtendedModularityMetrics takes as input:
+// * exp: the experiment
+// * grans: the list of granularities chosen for different clusterings
+// * output: the file to which to write the extended modularity metrics for the different clusterings
+// The function creates an output file with 3 entries:
+// 1) The cluster granularity, 2) Metric, 3) a 'x' if it is the best score
+func computeAndPlotExtendedModularityScores(exp *trajectory.Experiment, grans []int, output string) {
+	//create file for outputting the extended modularity scores
+	var metricOutput *os.File
+	var err error
+	if metricOutput, err = os.Create(output); err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := metricOutput.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	//for each clustering, calculated the extended modularity score
+	scores := make([]float64, len(grans))
+	best := 0
+	for i, gran := range grans {
+		clusterFile := fmt.Sprintf("%s.mci.I%d", exp.Name, gran)
+		graph := ParseMCLGraph(exp, clusterFile)
+		m := graph.ExtendedModularityMetric()
+		scores[i] = m
+		if m > scores[best] {
+			best = i
+		}
+	}
+	//log all extended modularity scores + mark the best one with "x"
+	fmt.Fprintf(metricOutput, "Granularity \t Extended Modularity Score \t Best \n")
+	for i, score := range scores {
+		if i == best {
+			fmt.Fprintf(metricOutput,
+				fmt.Sprintf("%d \t %s \t x \n", grans[i], strconv.FormatFloat(score, 'f', -1, 64)))
+		} else {
+			fmt.Fprintf(metricOutput,
+				fmt.Sprintf(" %d \t %s \n", grans[i], strconv.FormatFloat(score, 'f', -1, 64)))
+		}
+	}
 }
