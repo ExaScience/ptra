@@ -220,7 +220,7 @@ func MakeDxDPatients(size int) [][][]*Patient {
 type Experiment struct {
 	NofAgeGroups, NofRegions, Level, NofDiagnosisCodes int
 	DxDRR                                              [][]float64    //per disease pair, relative risk score (RR)
-	DxDRRPval                                          [][]float64    //per disease pair, p-value for the RR scores
+	DxDRREmpProb                                       [][]float64    //per disease pair, empirical probability for the RR scores
 	DxDPatients                                        [][][]*Patient //per disease pair, all patients diagnosed
 	DPatients                                          [][]*Patient   //per disease, all patients diagnosed
 	Cohorts                                            []*Cohort      //cohorts in the experiment
@@ -486,7 +486,7 @@ func InitializeExperimentRelativeRiskRatios(exp *Experiment, minTime, maxTime fl
 							if probd2Notd1Exposed >= probd2d1Exposed {
 								continue // skip sampling for testing d1->d2 pair because it is unlikely
 							}
-							var pval float64
+							var pval float64            //empirical probability: ctr not(d1)->d2/iter
 							d2CtrInNotExposedGroup := 0 // will be average if N iterations
 							for i := 0; i < iter; i++ {
 								d2Ctr := 0
@@ -515,7 +515,7 @@ func InitializeExperimentRelativeRiskRatios(exp *Experiment, minTime, maxTime fl
 							RR := p1 / p2
 							// initialize RR, d1->d2 ctrs etc
 							exp.DxDRR[d1][d2] = RR
-							exp.DxDRRPval[d1][d2] = pval
+							exp.DxDRREmpProb[d1][d2] = pval
 							exp.DxDPatients[d1][d2] = d1FollowedByd2Patients
 						}
 					}

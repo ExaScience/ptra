@@ -519,7 +519,7 @@ func convertToDirectTrajectoryClusterGraphsRRDot(exp *trajectory.Experiment, inp
 				if !edgePrinted[d1][d2] {
 					edgePrinted[d1][d2] = true
 					RR := strconv.FormatFloat(exp.DxDRR[d1][d2], 'f', 2, 64)
-					label := RR + " [" + strconv.FormatFloat(exp.DxDRRPval[d1][d2], 'f', 2, 64) + "]"
+					label := RR + " (" + strconv.FormatFloat(exp.DxDRREmpProb[d1][d2], 'f', 2, 64) + ")"
 					fmt.Fprintf(ofile,
 						fmt.Sprintf("    c%d_%d -> c%d_%d [label=\"%s\" penwidth=%s weight=%s]\n", nofClusters-1, d1, nofClusters-1, d2, label, RR, RR))
 				}
@@ -622,7 +622,7 @@ func convertToDirectTrajectoryClusterGraphsDot(exp *trajectory.Experiment, input
 					v := float64(t.PatientNumbers[i-1]) / 10.0
 					n := strconv.FormatInt(int64(t.PatientNumbers[i-1]), 10)
 					ns := strconv.FormatFloat(v, 'f', 2, 64)
-					label := n + " [" + strconv.FormatFloat(exp.DxDRRPval[d1][d2], 'f', 2, 64) + "]"
+					label := n + " (" + strconv.FormatFloat(exp.DxDRREmpProb[d1][d2], 'f', 2, 64) + ")"
 					fmt.Fprintf(ofile,
 						fmt.Sprintf("    c%d_%d -> c%d_%d [label=\"%s\" penwidth=%s weight=%s]\n", nofClusters-1, d1, nofClusters-1, d2, label, ns, ns))
 				}

@@ -372,7 +372,7 @@ func ParseData(name, patientFile, diagnosisFile, diagnosisInfoFile, actFile stri
 		Level:             level,
 		NofDiagnosisCodes: nofDiagnosisCodes,
 		DxDRR:             trajectory.MakeDxDRR(nofDiagnosisCodes),
-		DxDRRPval:         trajectory.MakeDxDRR(nofDiagnosisCodes),
+		DxDRREmpProb:      trajectory.MakeDxDRR(nofDiagnosisCodes),
 		DxDPatients:       trajectory.MakeDxDPatients(nofDiagnosisCodes),
 		DPatients:         mergedCohort.DPatients,
 		Cohorts:           cohorts,

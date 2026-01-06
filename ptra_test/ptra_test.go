@@ -254,7 +254,7 @@ func testInitCohortsWithFakePatients(t *testing.T) {
 		Level:             0,
 		NofDiagnosisCodes: 4,
 		DxDRR:             trajectory.MakeDxDRR(4),
-		DxDRRPval:         trajectory.MakeDxDRR(4),
+		DxDRREmpProb:      trajectory.MakeDxDRR(4),
 		DxDPatients:       trajectory.MakeDxDPatients(4),
 		DPatients:         cohort.DPatients,
 		Name:              "exp1",
