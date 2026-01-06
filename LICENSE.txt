@@ -1,5 +1,5 @@
 PTRA: Patient Trajectory Analysis Library.
-Copyright (c) 2022 imec vzw.
+Copyright (c) 2022-2026 imec vzw.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as

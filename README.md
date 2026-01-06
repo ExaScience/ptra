@@ -198,13 +198,16 @@ The `ptra` command requires four arguments:
   the trajectory transitions are annotated with the number of patients in the trajectory so far, and second .gml file
   where the trajectory transitions are annotated with the relative risk score (RR) for the diagnosis pairs.
 
+       4. a DOT (.dot) file as alternative to the .gml files. DOT files can be visualised using [graphviz](https://graphviz.org/).
+          E.g. using the command:
+          ```dot -T png exp1.mci.I40.trajectories.RR.dot -o clusters.png```
+       The edges in the graph are annotated respectively with the RR scores or the number of patients. In case of the RR scores, these are itself annotated with an empirical probability. E.g. for the RR for A -> B, this probability counts how often #(not(A) -> B) > #(A ->B) is sampled. Ideally this value is very small. The ptra algorithm filters all disease pairs (A, B) where this value is > 0.0001. 
+
+3. a file ending on `.scores`. This file contains the extended modularity scores calculated for each clustering. The extended modularity score is a quality metric for clustering. A modularity score > 0.03 is considered good. The file lists three tables containing 1) the granularity of the clustering 2) the modularity score and 3) a `x` if it is the best score. 
+
      Example:
 
      ![image_cluster.png](image_cluster.png)
-
-        4. a DOT (.dot) file as alternative to the .gml files. DOT files can be visualised using [graphviz](https://graphviz.org/).
-   E.g. using the command:
-   ```dot -T png exp1.mci.I40.trajectories.RR.dot -o clusters.png```
 
 ### Optional flags
 
