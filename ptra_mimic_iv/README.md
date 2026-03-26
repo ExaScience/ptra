@@ -1,6 +1,6 @@
 # ptra\_mimic\_iv — MIMIC-IV Use Case
 
-Standalone `ptra` application for trajectory analysis on [MIMIC-IV](https://physionet.org/content/mimiciv/) hospital data. It uses **HCPCS procedure events** (`hpcsevents.csv`) as the temporal events for building patient trajectories.
+Standalone `ptra` application for trajectory analysis on [MIMIC-IV](https://physionet.org/content/mimiciv/) hospital data. It uses **HCPCS procedure events** (`hcpcsevents.csv`) as the temporal events for building patient trajectories.
 
 For general background on the algorithm and the analysis pipeline, see the [main README](../README.md).
 
@@ -8,10 +8,10 @@ For general background on the algorithm and the analysis pipeline, see the [main
 
 Two CSV files from the MIMIC-IV `hosp` module are required:
 
-| File | Used columns | Purpose |
-|------|-------------|---------|
-| `patients.csv` | `subject_id`, `gender`, `anchor_age`, `anchor_year` | Patient demographics; YOB is estimated as `anchor_year − anchor_age` |
-| `hpcsevents.csv` | `subject_id`, `chartdate`, `hcpcs_cd`, `short_description` | Temporal events; each unique HCPCS code becomes an event type |
+| File              | Used columns | Purpose |
+|-------------------|-------------|---------|
+| `patients.csv`    | `subject_id`, `gender`, `anchor_age`, `anchor_year` | Patient demographics; YOB is estimated as `anchor_year − anchor_age` |
+| `hcpcsevents.csv` | `subject_id`, `chartdate`, `hcpcs_cd`, `short_description` | Temporal events; each unique HCPCS code becomes an event type |
 
 Columns are resolved by header name, so column order does not matter.
 
@@ -24,15 +24,16 @@ go build -o bin/ptra_mimic_iv ./ptra_mimic_iv/
 ## Usage
 
 ```
-ptra_mimic_iv <patients.csv> <hpcsevents.csv> <outputPath> [flags]
+ptra_mimic_iv <hospDir> <outputPath> [flags]
 ```
+
+`hospDir` is the path to the MIMIC-IV `hosp` directory that contains `patients.csv` and `hcpcsevents.csv`. The program locates both files automatically.
 
 ### Example
 
 ```bash
 ./bin/ptra_mimic_iv \
-  /path/to/mimiciv/hosp/patients.csv \
-  /path/to/mimiciv/hosp/hpcsevents.csv \
+  /path/to/mimiciv/hosp/ \
   ./output/ \
   --nofAgeGroups 10 --minPatients 50 --iter 400 --saveRR output/rr.csv
 ```

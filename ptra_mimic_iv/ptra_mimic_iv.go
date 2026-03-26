@@ -17,13 +17,13 @@
 // <https://github.com/ExaScience/ptra/blob/master/LICENSE.txt>.
 
 // ptra_mimic_iv is a standalone application for patient trajectory analysis on
-// MIMIC-IV hospital data.  It reads hpcsevents.csv (HCPCS procedure events) and
+// MIMIC-IV hospital data.  It reads hcpcsevents.csv (HCPCS procedure events) and
 // patients.csv from the MIMIC-IV dataset and runs the full ptra pipeline:
 // parse → relative-risk scoring → trajectory building → output → optional clustering.
 //
 // Usage:
 //
-//	ptra_mimic_iv <patients.csv> <hpcsevents.csv> <outputPath> [flags]
+//	ptra_mimic_iv <hospDir> <outputPath> [flags]
 package main
 
 import (
@@ -55,7 +55,11 @@ func programMessage() string {
 }
 
 const helpText = "\nptra_mimic_iv parameters:\n" +
-	"ptra_mimic_iv patients.csv hpcsevents.csv outputPath\n" +
+	"ptra_mimic_iv hospDir outputPath\n" +
+	"\n" +
+	"  hospDir    Path to the MIMIC-IV hosp directory containing patients.csv and hcpcsevents.csv\n" +
+	"  outputPath Directory where output files are written\n" +
+	"\n" +
 	"[--nofAgeGroups nr]\n" +
 	"[--maxYears nr]\n" +
 	"[--minYears nr]\n" +
@@ -180,13 +184,13 @@ func resolveColumns(header []string) (colSubjectID, colChartDate, colHcpcsCd, co
 		}
 	}
 	if colSubjectID == -1 || colChartDate == -1 || colHcpcsCd == -1 {
-		panic("hpcsevents.csv must contain subject_id, chartdate, and hcpcs_cd columns")
+		panic("hcpcsevents.csv must contain subject_id, chartdate, and hcpcs_cd columns")
 	}
 	return
 }
 
 // parseHCPCSEventsWithPatients parses patients.csv (small, fully loaded) then streams
-// hpcsevents.csv row-by-row to build a trajectory.Experiment.
+// hcpcsevents.csv row-by-row to build a trajectory.Experiment.
 func parseHCPCSEventsWithPatients(hcpcsFile, patientsFile string, nofCohortAges int,
 	filters []trajectory.PatientFilter) (*trajectory.Experiment, *trajectory.PatientMap) {
 
@@ -231,7 +235,7 @@ func parseHCPCSEventsWithPatients(hcpcsFile, patientsFile string, nofCohortAges 
 	pFile.Close()
 	fmt.Println("Loaded demographics for ", len(demoMap), " patients.")
 
-	// --- stream hpcsevents.csv ---
+	// --- stream hcpcsevents.csv ---
 	fmt.Println("Parsing MIMIC-IV HCPCS events from: ", hcpcsFile)
 	file, err := os.Open(hcpcsFile)
 	if err != nil {
@@ -398,9 +402,8 @@ func parseHCPCSEventsWithPatients(hcpcsFile, patientsFile string, nofCohortAges 
 func main() {
 	var (
 		// required positional arguments
-		patientsFile string
-		hcpcsFile    string
-		outputPath   string
+		hospDir    string
+		outputPath string
 		// optional flags
 		nofAgeGroups         int
 		maxYears             float64
@@ -439,11 +442,28 @@ func main() {
 	flags.StringVar(&pfilters, "pfilters", "id", "Patient filters: id,male,female,age70+,age70- (comma-separated).")
 
 	// parse
-	parseFlags(flags, 4, helpText)
-	patientsFile = getFileName(os.Args[1], helpText)
-	hcpcsFile = getFileName(os.Args[2], helpText)
-	outputPath, _ = filepath.Abs(getFileName(os.Args[3], helpText))
+	parseFlags(flags, 3, helpText)
+	hospDir = getFileName(os.Args[1], helpText)
+	outputPath, _ = filepath.Abs(getFileName(os.Args[2], helpText))
 	outputPath = outputPath + string(filepath.Separator)
+
+	// derive input file paths from the hosp directory and verify they exist
+	patientsFile := filepath.Join(hospDir, "patients.csv")
+	hcpcsFile := filepath.Join(hospDir, "hcpcsevents.csv")
+
+	missing := false
+	if _, err := os.Stat(patientsFile); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Error: patients.csv not found in %s\n", hospDir)
+		missing = true
+	}
+	if _, err := os.Stat(hcpcsFile); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Error: hcpcsevents.csv not found in %s\n", hospDir)
+		missing = true
+	}
+	if missing {
+		fmt.Fprintf(os.Stderr, "The hospDir must point to a MIMIC-IV hosp directory containing both files.\n")
+		os.Exit(1)
+	}
 
 	// create output directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
@@ -452,7 +472,7 @@ func main() {
 
 	// log the command
 	var command bytes.Buffer
-	fmt.Fprint(&command, os.Args[0], " ", patientsFile, " ", hcpcsFile, " ", outputPath)
+	fmt.Fprint(&command, os.Args[0], " ", hospDir, " ", outputPath)
 	fmt.Fprint(&command, " --nofAgeGroups ", nofAgeGroups)
 	fmt.Fprint(&command, " --maxYears ", maxYears)
 	fmt.Fprint(&command, " --minYears ", minYears)
