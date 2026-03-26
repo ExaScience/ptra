@@ -269,3 +269,36 @@ func BladderCancerTrajectoryFilter(exp *trajectory.Experiment) trajectory.Trajec
 		return false
 	}
 }
+
+func codeMember(code string, categories []string) bool {
+	for _, cat := range categories {
+		if code == cat {
+			return true
+		}
+	}
+	return false
+}
+
+func Icd10TrajectoryFilter(exp *trajectory.Experiment, codes []string) trajectory.TrajectoryFilter {
+	//Determine all diagnoses that match the given codes, either exactly or either the top-level category
+	codeRelatedMap := map[int]bool{}
+	for did, _ := range exp.NameMap {
+		icdCode := exp.IdMap[did]
+		if len(icdCode) >= 3 {
+			subCode := icdCode[0:3]
+			if codeMember(subCode, codes) {
+				codeRelatedMap[did] = true
+			} else {
+				codeRelatedMap[did] = false
+			}
+		}
+	}
+	return func(t *trajectory.Trajectory) bool {
+		for _, did := range t.Diagnoses {
+			if codeRelatedMap[did] {
+				return true
+			}
+		}
+		return false
+	}
+}

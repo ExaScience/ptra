@@ -18,6 +18,10 @@
 
 package utils
 
+import (
+	"strings"
+)
+
 func MinInt(x, y int) int {
 	if x < y {
 		return x
@@ -39,4 +43,24 @@ func MemberInt(x int, y []int) bool {
 		}
 	}
 	return false
+}
+
+func WrapText(input string, maxWidth int) string {
+	words := strings.Fields(input)
+	var result strings.Builder
+	lineLen := 0
+
+	for _, word := range words {
+		if lineLen+len(word) > maxWidth {
+			result.WriteString("\n")
+			lineLen = 0
+		} else if lineLen > 0 {
+			result.WriteString(" ")
+			lineLen++
+		}
+		result.WriteString(word)
+		lineLen += len(word)
+	}
+
+	return result.String()
 }

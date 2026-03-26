@@ -21,6 +21,7 @@ package main
 import (
 	"bytes"
 	"log"
+	"log/slog"
 	"ptra/app"
 	"ptra/cluster"
 	"ptra/trajectory"
@@ -115,15 +116,15 @@ The flags are:
 */
 
 const (
-	programVersion = 0.1
-	programName    = "ptra"
+	triNetXProgramVersion = 0.1
+	triNetXProgramName    = "ptra - trinetx"
 )
 
-func programMessage() string {
-	return fmt.Sprint(programName, " version ", programVersion, " compiled with ", runtime.Version())
+func triNetXProgramMessage() string {
+	return fmt.Sprint(triNetXProgramName, " version ", triNetXProgramVersion, " compiled with ", runtime.Version())
 }
 
-const ptraHelp = "\nptra parameters:\n" +
+const triNetXPtraHelp = "\nptra parameters:\n" +
 	"ptra patientInfoFile diagnosisInfoFile diagnosesFile outputPath \n" +
 	"[--nofAgeGroups nr]\n" +
 	"[--lvl nr]\n" +
@@ -146,7 +147,7 @@ const ptraHelp = "\nptra parameters:\n" +
 	"[--treatmentInfo file]\n" +
 	"[--nrOfThreads nr]\n"
 
-func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
+func triNetXParseFlags(flags flag.FlagSet, requiredArgs int, help string) {
 	if len(os.Args) < requiredArgs {
 		fmt.Fprintln(os.Stderr, "Incorrect number of parameters.")
 		fmt.Fprint(os.Stderr, help)
@@ -168,7 +169,7 @@ func parseFlags(flags flag.FlagSet, requiredArgs int, help string) {
 	}
 }
 
-func getFileName(s, help string) string {
+func triNetXGetFileName(s, help string) string {
 	switch s {
 	case "-h", "--h", "-help", "--help":
 		fmt.Fprint(os.Stderr, help)
@@ -177,7 +178,7 @@ func getFileName(s, help string) string {
 	return s
 }
 
-func getPatientFilter(s string, tinfo map[string][]*app.TumorInfo) trajectory.PatientFilter {
+func triNetXPatientFilter(s string, tinfo map[string][]*app.TumorInfo) trajectory.PatientFilter {
 	id := func(p *trajectory.Patient) bool { return true }
 	switch s {
 	case "id":
@@ -229,16 +230,16 @@ func getPatientFilter(s string, tinfo map[string][]*app.TumorInfo) trajectory.Pa
 	}
 }
 
-func getPatientFilters(f string, tinfo map[string][]*app.TumorInfo) []trajectory.PatientFilter {
+func triNetXGetPatientFilters(f string, tinfo map[string][]*app.TumorInfo) []trajectory.PatientFilter {
 	fs := strings.Split(f, ",")
 	result := []trajectory.PatientFilter{}
 	for _, f := range fs {
-		result = append(result, getPatientFilter(f, tinfo))
+		result = append(result, triNetXPatientFilter(f, tinfo))
 	}
 	return result
 }
 
-func getTrajectoryFilter(s string, exp *trajectory.Experiment) trajectory.TrajectoryFilter {
+func triNetXGetTrajectoryFilter(s string, exp *trajectory.Experiment) trajectory.TrajectoryFilter {
 	id := func(t *trajectory.Trajectory) bool { return true }
 	switch s {
 	case "neoplasm":
@@ -250,11 +251,11 @@ func getTrajectoryFilter(s string, exp *trajectory.Experiment) trajectory.Trajec
 	}
 }
 
-func getTrajectoryFilters(f string, exp *trajectory.Experiment) []trajectory.TrajectoryFilter {
+func triNetXGetTrajectoryFilters(f string, exp *trajectory.Experiment) []trajectory.TrajectoryFilter {
 	fs := strings.Split(f, ",")
 	result := []trajectory.TrajectoryFilter{}
 	for _, f := range fs {
-		result = append(result, getTrajectoryFilter(f, exp))
+		result = append(result, triNetXGetTrajectoryFilter(f, exp))
 	}
 	return result
 }
@@ -329,14 +330,14 @@ func main() {
 	flags.StringVar(&treatmentInfo, "treatmentInfo", "", "A file with information about patient cancer stages.")
 	flags.StringVar(&tfilters, "tfilters", "id", "A list of pfilters to restrict output of trajectories")
 	// parse optional arguments
-	parseFlags(flags, 5, ptraHelp)
+	triNetXParseFlags(flags, 5, triNetXPtraHelp)
 	// parse required arguments
-	patientInfo = getFileName(os.Args[1], ptraHelp)
-	diagnosisInfo = getFileName(os.Args[2], ptraHelp)
-	patientDiagnoses = getFileName(os.Args[3], ptraHelp)
-	outputPath, _ = filepath.Abs(getFileName(os.Args[4], ptraHelp))
+	patientInfo = triNetXGetFileName(os.Args[1], triNetXPtraHelp)
+	diagnosisInfo = triNetXGetFileName(os.Args[2], triNetXPtraHelp)
+	patientDiagnoses = triNetXGetFileName(os.Args[3], triNetXPtraHelp)
+	outputPath, _ = filepath.Abs(triNetXGetFileName(os.Args[4], triNetXPtraHelp))
 	outputPath = outputPath + string(filepath.Separator)
-	fmt.Println("Output path: ", outputPath)
+	slog.Info("Output", slog.String("path", outputPath))
 	// create output directory
 	err := os.MkdirAll(filepath.Dir(outputPath), 0700)
 	if err != nil {
@@ -377,7 +378,7 @@ func main() {
 		fmt.Fprint(&command, " --nrOfThreads ", nrOfThreads)
 	}
 	// start execution
-	log.Println(programMessage())
+	log.Println(triNetXProgramMessage())
 	log.Println("Executing command:\n", command.String())
 	//1. Parse inputs into experiment
 	// Parse Tumor info
@@ -386,7 +387,7 @@ func main() {
 		tinfo = app.ParsetTriNetXTumorData(tumorInfo) // need parsed patients to be able to parse tumor data file
 	}
 	exp, patients := app.ParseTriNetXData("exp1", patientInfo, patientDiagnoses, diagnosisInfo,
-		treatmentInfo, nofAgeGroups, lvl, minYears, maxYears, ICD9ToICD10File, getPatientFilters(pfilters, tinfo))
+		treatmentInfo, nofAgeGroups, lvl, ICD9ToICD10File, triNetXGetPatientFilters(pfilters, tinfo))
 	//2. Initialise relative risk ratios or load them from file from a previous run
 	if loadRR != "" {
 		trajectory.LoadRRMatrix(exp, loadRR)
@@ -403,10 +404,10 @@ func main() {
 	exp.DPatients = nil
 	//3. Build the trajectories
 	trajectory.BuildTrajectories(exp, minPatients, maxTrajectoryLength, minTrajectoryLength, minYears, maxYears, rr,
-		getTrajectoryFilters(tfilters, exp))
+		triNetXGetTrajectoryFilters(tfilters, exp))
 	//4. Plot trajectories to file
 	trajectory.PrintTrajectoriesToFile(exp, outputPath)
-	fmt.Println("Collected trajectories: ")
+	slog.Info("Collected trajectories: ")
 	for i := 0; i < utils.MinInt(len(exp.Trajectories), 100); i++ {
 		trajectory.PrintTrajectory(exp.Trajectories[i], exp)
 	}
@@ -417,7 +418,7 @@ func main() {
 			gi, _ := strconv.ParseInt(g, 10, 0)
 			clusterGranularityList = append(clusterGranularityList, int(gi))
 		}
-		fmt.Println("MCL Clustering:")
+		slog.Info("MCL Clustering:")
 		//ClusterTrajectories(exp, clusterGranularityList, outputPath, mclPath)
 		cluster.ClusterTrajectoriesDirectly(exp, clusterGranularityList, outputPath, mclPath)
 	}

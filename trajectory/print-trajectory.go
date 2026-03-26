@@ -20,26 +20,29 @@ package trajectory
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"ptra/utils"
 	"strconv"
+	"strings"
 )
 
 // Plotting of trajectories
 
 // PrintTrajectory prints a trajectory to standard output.
 func PrintTrajectory(t *Trajectory, exp *Experiment) {
-	j := 0
+	result := []string{}
 	for i, d := range t.Diagnoses {
-		dName := exp.NameMap[d]
-		fmt.Print(dName)
-		if i != len(t.Diagnoses)-1 {
-			fmt.Print(" -- ", t.PatientNumbers[j], " --> ")
+		result = append(result, exp.NameMap[d]) // the name
+		if i < len(t.Diagnoses)-1 {
+			result = append(result,
+				fmt.Sprintf("--<%d>-->", t.PatientNumbers[i])) // the edge number
 		}
-		j++
 	}
-	fmt.Println(" ")
+	slog.Info("\t",
+		slog.String("Trajectory", strings.Join(result, " ")),
+	)
 }
 
 // printTrajectoriesToTabFile prints a human-readable representation of trajectories to a tab file. Per trajectory, it
@@ -211,17 +214,23 @@ func printTrajectoriesToIndividualGraphsFile(exp *Experiment, name string) {
 // - A GML file with one graph reprsenting all trajectories
 // - A GML file where each trajectory is represented as an individula subgraph
 func PrintTrajectoriesToFile(exp *Experiment, path string) {
-	// print the trajectories to file
-	// create a file where all trajectories are seperate graphs
+	// print the (unclustered) trajectories to file
+	// create a file where all trajectories are separate graphs
 	// create a file where all trajectories are combined into 1 graph
 	// create a file that just has each trajectory as a tab seperated list of disease codes
-	tabFileName := filepath.Join(path, fmt.Sprintf("%s-trajectories.tab", exp.Name))
+	dirName := fmt.Sprintf("%s-unclustered-trajectories/", exp.Name)
+	outputDir := filepath.Join(path, dirName) + string(filepath.Separator)
+	derr := os.MkdirAll(outputDir, 0777)
+	if derr != nil {
+		panic(derr)
+	}
+	tabFileName := filepath.Join(outputDir, fmt.Sprintf("%s-trajectories.tab", exp.Name))
 	printTrajectoriesToTabFile(exp.Trajectories, exp.NameMap, tabFileName)
-	tabFileName2 := filepath.Join(path, fmt.Sprintf("%s-pairs.tab", exp.Name))
+	tabFileName2 := filepath.Join(outputDir, fmt.Sprintf("%s-pairs.tab", exp.Name))
 	printPairsToTabFile(exp, tabFileName2)
-	graphFileName := filepath.Join(path, fmt.Sprintf("%s-trajectories-merged-graph.gml", exp.Name))
+	graphFileName := filepath.Join(outputDir, fmt.Sprintf("%s-trajectories-merged-graph.gml", exp.Name))
 	printTrajectoriesToOneGraphFile(exp, graphFileName)
-	graphsFileName := filepath.Join(path, fmt.Sprintf("%s-trajectories-individual-graphs.gml", exp.Name))
+	graphsFileName := filepath.Join(outputDir, fmt.Sprintf("%s-trajectories-individual-graphs.gml", exp.Name))
 	printTrajectoriesToIndividualGraphsFile(exp, graphsFileName)
 }
 
@@ -313,7 +322,7 @@ func PrintClustersToCSVFiles(exp *Experiment, pName, cName string) {
 		panic(err)
 	}
 	// print header
-	fmt.Fprintf(pFile, "PID,AgeEOI,Sex,PIDString\n")
+	fmt.Fprintf(pFile, "PID,AgeEOI,Sex,PIDString,Control\n")
 	pSeen := map[int]bool{}
 	for _, t := range exp.Trajectories {
 		ps := t.Patients
@@ -327,7 +336,13 @@ func PrintClustersToCSVFiles(exp *Experiment, pName, cName string) {
 				} else {
 					sex = "F"
 				}
-				fmt.Fprintf(pFile, "%d,%d,%s,%s\n", p.PID, ageEOI, sex, p.PIDString)
+				var control string
+				if p.Control {
+					control = "yes"
+				} else {
+					control = "no"
+				}
+				fmt.Fprintf(pFile, "%d,%d,%s,%s,%s\n", p.PID, ageEOI, sex, p.PIDString, control)
 			}
 		}
 	}

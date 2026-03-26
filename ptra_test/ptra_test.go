@@ -20,49 +20,51 @@ package ptra_test
 
 import (
 	"fmt"
+	"log/slog"
 	"ptra/app"
 	"ptra/trajectory"
 	"testing"
 )
 
-func TestParseIcd10XML(t *testing.T) {
-	file := "./icd10cm_tabular_2022.xml"
+func testParseIcd10XML(t *testing.T) {
+	file := "./data/icd10cm_tabular_2022.xml"
 	icd10XML := app.ParseIcd10HierarchyFromXml(file)
 	app.PrintIcd10Hierarchy(icd10XML)
 }
 
-func TestInitializeIcd10NameMap(t *testing.T) {
-	file := "./icd10cm_tabular_2022.xml"
+func testInitializeIcd10NameMap(t *testing.T) {
+	file := "./data/icd10cm_tabular_2022.xml"
 	icd10Names := app.InitializeIcd10NameMap(file)
 	app.PrintIcd10NameMap(icd10Names)
 }
 
-func TestInitializeICD10AnalysisMap(t *testing.T) {
-	file := "./icd10cm_tabular_2022.xml"
+func testInitializeICD10AnalysisMap(t *testing.T) {
+	file := "./data/icd10cm_tabular_2022.xml"
+	//file := "./icd102019en.xml"
 	icd10Names := app.InitializeIcd10NameMap(file)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 0)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 1)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 2)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 3)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 4)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 5)
-	app.IntializeIcd10AnalysisMaps(icd10Names, 6)
+	app.IntializeIcd10AnalysisMaps(icd10Names, 0, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 1, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 2, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 3, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 4, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 5, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
+	app.IntializeIcd10AnalysisMaps(icd10Names, 6, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 }
 
-func TestParseTrinetXPatients(t *testing.T) {
-	file := "./patient.csv"
+func testParseTrinetXPatients(t *testing.T) {
+	file := "./data/fake-patients-simplified.csv"
 	nofCohortAges := 10
 	app.ParseTriNetXPatientData(file, nofCohortAges)
 }
 
-func TestInitializeCohorts(t *testing.T) {
-	file1 := "./patient.csv"
+func testInitializeCohorts(t *testing.T) {
+	file1 := "./data/fake-patients-simplified.csv"
 	nofCohortAges := 10
 	patients, _ := app.ParseTriNetXPatientData(file1, nofCohortAges)
-	file2 := "./diagnosis.csv"
-	file3 := "./icd10cm_tabular_2022.xml"
+	file2 := "./data/fake-diagnoses-simplified.csv"
+	file3 := "./data/icd10cm_tabular_2022.xml"
 	level := 0
-	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level)
+	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 	app.ParseTrinetXPatientDiagnoses(file2, "", patients, analysisMaps, map[string]string{})
 	nofDiagnosisCodes := analysisMaps.NofDiagnosisCodes
 	nofRegions := 1
@@ -70,37 +72,37 @@ func TestInitializeCohorts(t *testing.T) {
 	for _, cohort := range cohorts {
 		trajectory.PrintCohort(cohort, 18)
 	}
-	fmt.Println("Map DID -> Medical Name")
+	slog.Info("Map DID -> Medical Name")
 	collected := make([][]string, len(analysisMaps.NameMap))
 	for k, v := range analysisMaps.NameMap {
 		collected[k] = append(collected[k], v)
 	}
 	for _, v := range collected {
-		fmt.Println(v)
+		slog.Info(fmt.Sprint(v))
 		if len(v) > 1 {
-			fmt.Println("foo")
+			slog.Info("foo")
 		}
 	}
-	fmt.Println("Map Medical Name -> DID")
+	slog.Info("Map Medical Name -> DID")
 	collected2 := make([][]string, len(analysisMaps.NameMap))
 	for k, v := range analysisMaps.DIDMap {
 		collected2[v] = append(collected2[v], k)
 	}
 	for i, v := range collected2 {
-		fmt.Println(collected[i], " : ", v)
+		slog.Debug(fmt.Sprint(collected[i]) + " : " + fmt.Sprint(v))
 	}
 }
 
-func TestParseTrinetXPatientDiagnoses(t *testing.T) {
-	file1 := "./patient.csv"
+func testParseTrinetXPatientDiagnoses(t *testing.T) {
+	file1 := "./data/fake-patients-simplified.csv"
 	nofCohortAges := 10
 	patients, _ := app.ParseTriNetXPatientData(file1, nofCohortAges)
-	file2 := "./diagnosis.csv"
-	file3 := "./icd10cm_tabular_2022.xml"
+	file2 := "./data/fake-diagnoses-simplified.csv"
+	file3 := "./data/icd10cm_tabular_2022.xml"
 	level := 0
-	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level)
+	analysisMaps := app.InitializeIcd10AnalysisMapsFromXML(file3, level, app.GetIcd10DescToExcludeFromTriNetXAnalysis())
 	app.ParseTrinetXPatientDiagnoses(file2, "", patients, analysisMaps, map[string]string{})
-	fmt.Println("First 5 patients: ")
+	slog.Info("First 5 patients: ")
 	ctr := 0
 	for _, patient := range patients.PIDMap {
 		if ctr == 5 {
@@ -108,12 +110,16 @@ func TestParseTrinetXPatientDiagnoses(t *testing.T) {
 		}
 		if len(patient.Diagnoses) > 0 {
 			ctr++
-			fmt.Println(patient)
+			slog.Info("  " + fmt.Sprint(patient))
 		}
 	}
 }
 
-func TestInitCohortsWithFakePatients(t *testing.T) {
+func testInitCohortsWithFakePatients(t *testing.T) {
+	slog.Info("***********************************")
+	slog.Info("** Test 1: Artificial input data **")
+	slog.Info("***********************************")
+	// number of fake patients to generate:
 	n := 100
 	patients := []*trajectory.Patient{}
 	for i := 0; i < n; i++ {
@@ -235,7 +241,7 @@ func TestInitCohortsWithFakePatients(t *testing.T) {
 		FemaleCtr:    0,
 	}
 	cohorts := trajectory.InitializeCohorts(PMap, 2, 1, 4)
-	fmt.Println("Printing cohorts")
+	slog.Info("Printing cohorts")
 	for _, cohort := range cohorts {
 		trajectory.PrintCohort(cohort, 4)
 	}
@@ -248,6 +254,7 @@ func TestInitCohortsWithFakePatients(t *testing.T) {
 		Level:             0,
 		NofDiagnosisCodes: 4,
 		DxDRR:             trajectory.MakeDxDRR(4),
+		DxDRREmpProb:      trajectory.MakeDxDRR(4),
 		DxDPatients:       trajectory.MakeDxDPatients(4),
 		DPatients:         cohort.DPatients,
 		Name:              "exp1",
@@ -257,13 +264,19 @@ func TestInitCohortsWithFakePatients(t *testing.T) {
 	}
 	//initializeExperimentRelativeRiskRatios(exp, 0.5, 5.0)
 	trajectory.InitializeExperimentRelativeRiskRatios(exp, 0.5, 5.0, 10)
-	fmt.Println("Relative risk ratios: [")
-	for _, rr := range exp.DxDRR {
-		fmt.Print(rr, ", ")
+	slog.Info("Relative risk ratios: [")
+	for d, rr := range exp.DxDRR {
+		slog.Info("\t",
+			slog.Int("d", d),
+			slog.String("rrr", fmt.Sprint(rr)))
 	}
-	fmt.Println("...]")
-	trajectories := trajectory.BuildTrajectories(exp, 5, 3, 2, 1, 5, 1.0, []trajectory.TrajectoryFilter{})
-	fmt.Println("Collected ", len(trajectories), " trajectories.")
+	slog.Info("...]")
+	trajectories := trajectory.BuildTrajectories(exp, 5, 3, 2, 1, 5,
+		1.0, []trajectory.TrajectoryFilter{})
+
+	slog.Info("Collected Trajectories",
+		slog.Int("N", len(trajectories)))
+
 	for _, traj := range trajectories {
 		trajectory.PrintTrajectory(traj, exp)
 	}

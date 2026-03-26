@@ -89,9 +89,10 @@ The clustering is by default done via the [MCL](https://micans.org/mcl/) tool.
 
 # 6. Building
 
-The following information is relevant if you want to build `ptra` to obtain an executable. `ptra` out of the box implements 
-one use case (TriNetX), and building an executable hence by default generates a binary for this use case. For 
-instructions how to organise the code to build a binary for a new use case, please see the Implementation Manual.
+The following information is relevant if you want to build `ptra` to obtain an executable. The `ptra` repository also 
+contains code for one use case (TriNetX). You can either build a generic `ptra` binary or a binary for the TriNetX use 
+case. For instructions how to organise the code to build a binary for a new use case, please see the Implementation 
+Manual.
 
 `ptra` is implemented in Go. Please make sure you have a working installation of Go. You can install Go from the [Go
 website](https://golang.org/). Alternatively, most package managers provide options to install Go as a development tool. 
@@ -99,17 +100,217 @@ Check the documentation of the package manager of your Linux distribution for de
 
 First checkout the `ptra` sources using the following command:
 
-    go get -u github.com/exascience/ptra
+    git clone https://github.com/ExaScience/ptra.git
 
-This downloads the `ptra` Go source code, and creates the `ptra` binary in your configured Go home folder, for example 
-`~/go/bin/ptra`. See the [GOPATH](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) variable for your Go home 
-folder.
+This downloads the `ptra` Go source code.
+
+To build the generic binary:
+
+    go build -o ptra cmd/main.go
+
+To build the binary for the TrinetX use case:
+
+    go build -o ptra_trinetx cmd/main_trinetx.go
 
 Add the binary to your path, for example:
 
-    export PATH=$PATH:~/go/bin
+    export PATH=$PATH:~/pra/ptra
 
 # 7. Command Line Interface Reference (CLI)
+## Generic interface
+### Name
+`ptra` - a commandline tool for extracting statistically relevant trajectories from ICD10 diagnosis histories in CDC or 
+WHO format
+
+### Synopsis
+
+```
+    ptra patientInfoFile diagnosisInfoFile diagnosesFile outputPath 
+        --nofAgeGroups nr --lvl nr --minPatients nr --maxYears nr --minYears nr --maxTrajectoryLength nr
+        --minTrajectoryLength nr --name string --cluster --mclPath string --iter nr --saveRR file --loadRR file
+        --pfilters age+:nr,age-:nr,sex:[male | female]
+        --tfilters cat:[neoplasms|bc],code:icd10;icd10,...
+        --actFile file
+        --loglvl error | warning | info | debug | all
+```
+### Description
+The `ptra` command requires four arguments:
+
+1. `patientInfoFile`: this is a csv file containing patient information. The expected csv header is:
+   `patient_id, sex, year_of_birth, patient_regional_location, month_year_death`
+
+2. `diagnosisInfoFile`: this is a file mapping diagnosis IDs (ICD10) onto medical descriptions. This can
+   either be:
+   * an XML file containing the CDC ICD10 hierarchy with medical descriptors ([icd10cm_tabular_2022.xml](https://www.cms.gov/medicare/icd-10/2022-icd-10-cm))
+   * an XML file containing the WHO ICD10 hierarchy 
+   * a CCSR with CCSR categorization of the ICD10 hierarchy ([DXCCSR_v2022-1.CSV](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/dxccsr.jsp))
+   
+3. `diagnosesFile`: this is a csv file containing dated diagnoses for the patients in patientInfoFile. The expected 
+    csv header is: `patient_id,encounter_id,code_system, code, principal_diagnosis_indicator, admiting_diagnosis, reason_for_visit, date,
+   derived_by_trinetx, source_id`
+
+4. `outputPath`: a path where the outputs of the `ptra` run can be written.
+
+`ptra` creates multiple output files. This output is structured as follows:
+
+1. A folder `unclustered-trajectories` with all trajectories found by `ptra` (before clustering). This folder contains the
+   following files:
+
+       1. a tab file with the found trajectories. The tab file contains two lines per trajectory. The first line lists the diagnoses
+   in the trajectory, separated by tabs. The second line lists the number of patients between each transition in the trajectory.
+
+   Example:
+
+    ```
+    Cough \tab Dyspnea \tab COPD
+    150 \tab 50
+    ```
+       2. a tab file with the found diagnosis pairs and their relative risk scores. There is a single line that list the diagnoses and the RR.
+
+   Example:
+
+   ```Cough \tab Dyspnea \tab 1.95```
+
+       3. a gml file with all found trajectories as individual graphs. Useful for verifying outputs with few trajectories.
+
+       4. a gml file with all found trajectories plotted as one (large) graph. Useful for verifying output, but may be too
+   dense to view for large numbers of trajectories. In this case, clustering is recommended.
+
+2. a folder `clustered-trajectories` with clustered trajectories --if `ptra` was requested to cluster its output
+   (`--cluster` flag). This folder contains multiple subfolders:
+
+    1. A folder `mclOutput` with intermediate clustering output generated by the MCL tool. This is normally not relevant
+   to view for `ptra` users. It is useful for the `ptra` developers for debugging.
+   
+    2. A number of `clusters` folders containing clustered trajectories. A folder is generated for each chosen cluster
+  granularity when calling `ptra`, cf. `--clusterGranularities` option. By default, 4 granuarities are tried, so 4
+  `clusters` folders are created. Each `clusters` folder contains the following files:
+   
+        1. a csv file with cluster information. The header is: `PID,CID,TID,Age`. These represent the patient identifier, cluster
+  identifier, trajectory identifier, and age of the patient at the time they completed the trajectory.
+       
+        2. a csv file with information to link the patient analysis identifier used in `ptra` back to the TriNetX identifier. The
+  header of the csv file is: `PID,AgeEOI,Sex,PIDString`. This represents the patient id used in `ptra`, the age of the
+  patient at the event of interest, the sex of the patient, and the TriNetX identifier of the patient.
+       
+        3. two graph modeling language (.gml) files with the clustered trajectories organised as a subgraph per cluster. gml files
+  can be visualised with other tools such as [yEd](https://www.yworks.com/products/yed). There is one .gml file where
+  the trajectory transitions are annotated with the number of patients in the trajectory so far, and second .gml file
+  where the trajectory transitions are annotated with the relative risk score (RR) for the diagnosis pairs.
+
+       4. a DOT (.dot) file as alternative to the .gml files. DOT files can be visualised using [graphviz](https://graphviz.org/).
+          E.g. using the command:
+          ```dot -T png exp1.mci.I40.trajectories.RR.dot -o clusters.png```
+       The edges in the graph are annotated respectively with the RR scores or the number of patients. In case of the RR scores, these are itself annotated with an empirical probability. E.g. for the RR for A -> B, this probability counts how often #(not(A) -> B) > #(A ->B) is sampled. Ideally this value is very small. The ptra algorithm filters out all disease pairs (A, B) where this value is > 0.001. 
+
+3. a file ending on `.scores`. This file contains the extended modularity scores calculated for each clustering. The extended modularity score is a quality metric for clustering. A modularity score > 0.03 is considered good. The file lists three tables containing 1) the granularity of the clustering 2) the modularity score and 3) a `x` if it is the best score. 
+
+     Example:
+
+     ![image_cluster.png](image_cluster.png)
+
+### Optional flags
+
+The `ptra` command accepts the following optional flags:
+
+* `--nofAgeGroups nr`
+
+The number of age groups to consider when dividing the population into cohorts based on age. The tool automatically
+detects the oldest and youngest patients from input. The number of age groups is used to divide the minimum birth
+year and maximum birth year into age ranges. E.g. min birth year: 1900, max birth year: 2020, and nr of age groups:
+10, will create 10 cohorts where age ranges from [0,12],[12,22],...[108,120].
+
+* `--lvl nr`
+
+Sets the ICD10 level for the diagnosis input [0-6]. The tool maps all ICD10 codes to a medical meaningful term based on
+this chosen level. ICD10 codes of lower levels may be combined into the same code of a higher level. E.g. A00.0
+Cholera due to Vibrio cholerae 01, biovar cholerae and A00.1 Cholera due to Vibrio cholerae 01, biovar eltor are lvl
+3 codes and may be collapsed to A00 Cholera in lvl 2, or A00-A09 Intestinal infectious diseases in lvl 1, or A00-B99
+Certain infectious and parasitic diseases in lvl 0.
+
+* `--minPatients nr`
+
+Sets the minimum required number of patients in a trajectory.
+
+* `--maxYears nr`
+
+Sets the maximum number of years between subsequent diagnoses to be considered for inclusion in a trajectory. E.g.
+0.5 for half a year.
+
+* `--minYears nr`
+* 
+Sets the minimum number of years between subsequent diagnoses to be considered for inclusion in a trajectory. E.g. 0.5
+for half a year.
+
+* `--maxTrajectoryLength nr`
+
+Sets the maximum length of trajectories to be included in the output. E.g. 5 for trajectories with maximum 5 diagnoses.
+
+* `--minTrajectoryLength nr`
+
+Sets the minimum length of trajectories to be included in the output. E.g. 3 for trajectories with minimum 3 diagnoses.
+
+* `--name string`
+
+Sets the name of the experiment. This name is used to generate names for output files.
+
+* `--cluster`
+
+If this flag is passed, the computed trajectories are clustered and the clusters are outputted to file.
+
+* `--mclPath`
+
+Sets the path where the mcl binaries can be found.
+
+* `--iter nr`
+
+Sets the number of iterations to be used in the sampling experiments for calculating relative risk ratios. If iter
+is 400, the calculated p-values are within 0.05 of the true p-values. For iter = 10000, the true p-values are within
+0.01 of the true p-values. The higher the number of iterations, the higher the runtime.
+
+* `--saveRR file`
+
+Save the RR matrix, a matrix that represents the RR calculated from the population for each possible combination of
+ICD10 diagnosis pairs. This matrix can be loaded in other `ptra` runs to avoid recalculating the RR scores. This can
+be useful if parameters want to be explored that do not impact the RR calculation itself. Only `iter`, `maxYears` and
+`minYears`, and `filters` influence RR calculation. Variations of other parameters for constructing trajectories from RR
+scores, such as `maxTrajectoryLenght`, `minTrajectoryLength`, `minPatients`, `RR` etc might be explored in other runs.
+
+* `--loadRR file`
+
+Load the RR matrix from file. Such a file must be created by a previous run of `ptra` with the `--saveRR` flag.
+
+* `--pfilters age+:nr,age-:nr, [eoi+ | eoi-], sex:[male | female]`
+
+A list of filters for selecting/filtering patients from which to derive trajectories.
+
+* `--tfilters cat:[neoplasm | bc],code:icd10,icd10,...`
+
+A list of filters for reducing the output of trajectories. E.g. `cat:neoplasm` only outputs trajectories where there is 
+at least one diagnosis related to cancer. `cat:bc` only outputs trajectories where one diagnosis is assuming to be 
+related to bladder cancer. `code:icd10;icd10;...` filters trajectories where at least one of the listed icd10 codes is 
+present.
+
+* `--eoid icd10,icd10,...`
+
+A list of icd10 codes that represent the event of interest to track (e.g. cancer diagnosis). The event of interest can 
+for example be used in the patient filter (`--pfilters`) option (`eoi+ | eoi-`) to remove all diagnoses before/after the
+event of interest. Is also used in the metrics that are generated for the clusters, e.g. to annotate the average age of 
+patients at the time of the event of interest.
+
+* `--actFile file`
+
+A file containing WHO ACT codes, mapping a unique ACT ID to description. ACT codes may be registered in a similar way as 
+diagnoses and are included as events in trajectory building.
+
+* `--loglvl error | warning | info | debug | all`
+
+An option for toggling structured logging in ptra. You can choose the following level of detail for logging:
+- info: logs general information about the ptra execution. Includes all messages from the Warn, Error, and Info levels.
+- warn: logs warning messages that indicate potential issues with the ptra execution. Includes all messages from Warn 
+and Error levels.
+- error: logs only error messages.
+- debug: most detailed logging level. Logs messages in the Debug, Info,  Warn, and Error level.
 ## TriNetX Use Case
 ### Name
 `ptra` - a commandline tool for extracting statistically relevant trajectories from ICD9/ICD10 diagnosis histories in 
@@ -141,38 +342,60 @@ The `ptra` command requires four arguments:
    derived_by_trinetx, source_id`
 4. `outputPath`: a path where the outputs of the `ptra` run can be written.  
 
-`ptra` creates multiple output files: 
+`ptra` creates multiple output files. This output is structured as follows:
 
-1. a tab file with the found trajectories. The tab file contains two lines per trajectory. The first line lists the diagnoses 
-  in the trajectory, separated by tabs. The second line lists the number of patients between each transition in the trajectory.
+1. A folder `unclustered-trajectories` with all trajectories found by `ptra` (before clustering). This folder contains the 
+following files:
 
-  Example:
+    1. a tab file with the found trajectories. The tab file contains two lines per trajectory. The first line lists the diagnoses 
+     in the trajectory, separated by tabs. The second line lists the number of patients between each transition in the trajectory.
 
-  ```
-  Cough \tab Dyspnea \tab COPD
-  150 \tab 50
-  ```
-2. a tab file with the found diagnosis pairs and their relative risk scores. There is a single line that list the diagnoses and the RR.
+    Example:
+
+    ```
+    Cough \tab Dyspnea \tab COPD
+    150 \tab 50
+    ```
+    2. a tab file with the found diagnosis pairs and their relative risk scores. There is a single line that list the diagnoses and the RR.
   
-  Example:
+    Example:
 
-  ```Cough \tab Dyspnea \tab 1.95```
+    ```Cough \tab Dyspnea \tab 1.95```
+    
+    3. a gml file with all found trajectories as individual graphs. Useful for verifying outputs with few trajectories.
 
-3. a folder with clustered trajectory output --if `ptra` was requested to cluster its output (`--cluster` flag). This folder 
-  contains per requested cluster granularity (`--cluster-granularities`) up to 4 files:
-   1. a csv file with cluster information. The header is: `PID,CID,TID,Age`. These represent the patient identifier, cluster 
-       identifier, trajectory identifier, and age of the patient at the time they completed the trajectory.
-   2. a csv file with information to link the patient analysis identifier used in `ptra` back to the TriNetX identifier. The
-       header of the csv file is: `PID,AgeEOI,Sex,PIDString`. This represents the patient id used in `ptra`, the age of the 
-       patient at the event of interest, the sex of the patient, and the TriNetX identifier of the patient.
-   3. two graph modeling language (.gml) files with the clustered trajectories organised as a subgraph per cluster. gml files
-       can be visualised with other tools such as [yEd](https://www.yworks.com/products/yed). There is one .gml file where 
-       the trajectory transitions are annotated with the number of patients in the trajectory so far, and second .gml file 
-       where the trajectory transitions are annotated with the relative risk score (RR) for the diagnosis pairs.
+    4. a gml file with all found trajectories plotted as one (large) graph. Useful for verifying output, but may be too 
+   dense to view for large numbers of trajectories. In this case, clustering is recommended.
+
+2. a folder `clustered-trajectories` with clustered trajectories --if `ptra` was requested to cluster its output
+(`--cluster` flag). This folder contains multiple subfolders:
+
+       1. A folder `mclOutput` with intermediate clustering output generated by the MCL tool. This is normally not relevant 
+      to view for `ptra` users. It is useful for the `ptra` developers for debugging.
+
+       2. A number of `clusters` folders containing clustered trajectories. A folder is generated for each chosen cluster 
+   granularity when calling `ptra`, cf. `--clusterGranularities` option. By default, 4 granuarities are tried, so 4 
+   `clusters` folders are created. Each `clusters` folder contains the following files:
+
+              1. a csv file with cluster information. The header is: `PID,CID,TID,Age`. These represent the patient identifier, cluster 
+          identifier, trajectory identifier, and age of the patient at the time they completed the trajectory.
+
+              2. a csv file with information to link the patient analysis identifier used in `ptra` back to the TriNetX identifier. The
+          header of the csv file is: `PID,AgeEOI,Sex,PIDString`. This represents the patient id used in `ptra`, the age of the 
+          patient at the event of interest, the sex of the patient, and the TriNetX identifier of the patient.
+
+              3. two graph modeling language (.gml) files with the clustered trajectories organised as a subgraph per cluster. gml files
+          can be visualised with other tools such as [yEd](https://www.yworks.com/products/yed). There is one .gml file where 
+          the trajectory transitions are annotated with the number of patients in the trajectory so far, and second .gml file 
+          where the trajectory transitions are annotated with the relative risk score (RR) for the diagnosis pairs.
   
-       Example:
+          Example:
 
-       ![image_cluster.png](image_cluster.png)
+          ![image_cluster.png](image_cluster.png)
+
+              4. a DOT (.dot) file as alternative to the .gml files. DOT files can be visualised using [graphviz](https://graphviz.org/). 
+         E.g. using the command:
+         ```dot -T png exp1.mci.I40.trajectories.RR.dot -o clusters.png```
 
 ### Optional flags
 
