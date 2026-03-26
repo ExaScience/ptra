@@ -424,15 +424,15 @@ func main() {
 	)
 
 	var flags flag.FlagSet
-	flags.IntVar(&nofAgeGroups, "nofAgeGroups", 6, "Number of age groups for cohort stratification.")
+	flags.IntVar(&nofAgeGroups, "nofAgeGroups", 5, "Number of age groups for cohort stratification.")
 	flags.IntVar(&nrOfThreads, "nrOfThreads", 0, "Number of threads (0 = GOMAXPROCS default).")
 	flags.Float64Var(&maxYears, "maxYears", 5.0, "Maximum years between consecutive events in a pair.")
 	flags.Float64Var(&minYears, "minYears", 0.5, "Minimum years between consecutive events in a pair.")
-	flags.IntVar(&minPatients, "minPatients", 100, "Minimum patients for last event in a trajectory.")
+	flags.IntVar(&minPatients, "minPatients", 5, "Minimum patients for last event in a trajectory.")
 	flags.IntVar(&maxTrajectoryLength, "maxTrajectoryLength", 5, "Maximum number of events in a trajectory.")
 	flags.IntVar(&minTrajectoryLength, "minTrajectoryLength", 3, "Minimum number of events in a trajectory.")
 	flags.StringVar(&name, "name", "mimic4_hcpcs", "Experiment name (used in output filenames).")
-	flags.IntVar(&iter, "iter", 10000, "Monte Carlo sampling iterations for RR calculation.")
+	flags.IntVar(&iter, "iter", 400, "Monte Carlo sampling iterations for RR calculation.")
 	flags.Float64Var(&rr, "RR", 1.0, "Minimum relative-risk score for considering pairs.")
 	flags.StringVar(&saveRR, "saveRR", "", "Save computed RR matrix to this file.")
 	flags.StringVar(&loadRR, "loadRR", "", "Load RR matrix from a previous run instead of computing.")
