@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -447,6 +448,9 @@ func InitializeExperimentRelativeRiskRatios(exp *Experiment, minTime, maxTime fl
 	for i := 0; i < exp.NofDiagnosisCodes; i++ {
 		indexVector = append(indexVector, i)
 	}
+	totalDiagnoses := int64(len(indexVector))
+	var progressCtr int64
+	fmt.Printf("Processing %d diagnosis codes...\n", totalDiagnoses)
 	parallel.Range(0, len(indexVector), 0, func(low, high int) {
 		for _, d1 := range indexVector[low:high] {
 			d1ExposedPatients := exp.DPatients[d1]
@@ -510,6 +514,11 @@ func InitializeExperimentRelativeRiskRatios(exp *Experiment, minTime, maxTime fl
 						}
 					}
 				})
+			}
+			done := atomic.AddInt64(&progressCtr, 1)
+			if done%500 == 0 || done == totalDiagnoses {
+				fmt.Printf("  Progress: %d / %d diagnosis codes processed (%.1f%%)\n",
+					done, totalDiagnoses, float64(done)/float64(totalDiagnoses)*100)
 			}
 		}
 	})

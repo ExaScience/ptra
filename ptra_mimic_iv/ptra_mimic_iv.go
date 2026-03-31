@@ -28,16 +28,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/csv"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
+	"ptra/app"
 	"ptra/cluster"
 	"ptra/trajectory"
 	"ptra/utils"
@@ -62,7 +59,7 @@ const helpText = "\nptra_mimic_iv parameters:\n" +
 	"  outputPath Directory where output files are written\n" +
 	"\n" +
 	"[--source hcpcs | diagnoses_icd]  Event source (default: hcpcs)\n" +
-	"[--ICD9ToICD10File file]          JSON mapping ICD-9 to ICD-10 (for diagnoses_icd)\n" +
+	"[--ICD9ToICD10File file]          JSON or CSV mapping ICD-9 to ICD-10 (for diagnoses_icd)\n" +
 	"[--nofAgeGroups nr]\n" +
 	"[--maxYears nr]\n" +
 	"[--minYears nr]\n" +
@@ -147,645 +144,6 @@ func getPatientFilters(f string) []trajectory.PatientFilter {
 }
 
 // ---------------------------------------------------------------------------
-// MIMIC-IV HCPCS parser (streaming)
-// ---------------------------------------------------------------------------
-
-// parseMIMIC4Date parses a date string in YYYY-MM-DD format into a trajectory.DiagnosisDate.
-func parseMIMIC4Date(dateStr string) (trajectory.DiagnosisDate, bool) {
-	parts := strings.Split(dateStr, "-")
-	if len(parts) != 3 {
-		return trajectory.DiagnosisDate{}, false
-	}
-	year, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return trajectory.DiagnosisDate{}, false
-	}
-	month, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return trajectory.DiagnosisDate{}, false
-	}
-	day, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return trajectory.DiagnosisDate{}, false
-	}
-	return trajectory.DiagnosisDate{Year: year, Month: month, Day: day}, true
-}
-
-// resolveColumns maps CSV header names to their column indices.
-func resolveColumns(header []string) (colSubjectID, colChartDate, colHcpcsCd, colShortDesc int) {
-	colSubjectID, colChartDate, colHcpcsCd, colShortDesc = -1, -1, -1, -1
-	for i, h := range header {
-		switch strings.TrimSpace(strings.ToLower(h)) {
-		case "subject_id":
-			colSubjectID = i
-		case "chartdate":
-			colChartDate = i
-		case "hcpcs_cd":
-			colHcpcsCd = i
-		case "short_description":
-			colShortDesc = i
-		}
-	}
-	if colSubjectID == -1 || colChartDate == -1 || colHcpcsCd == -1 {
-		panic("hcpcsevents.csv must contain subject_id, chartdate, and hcpcs_cd columns")
-	}
-	return
-}
-
-// parseHCPCSEventsWithPatients parses patients.csv (small, fully loaded) then streams
-// hcpcsevents.csv row-by-row to build a trajectory.Experiment.
-func parseHCPCSEventsWithPatients(hcpcsFile, patientsFile string, nofCohortAges int,
-	filters []trajectory.PatientFilter) (*trajectory.Experiment, *trajectory.PatientMap) {
-
-	// --- load patient demographics into a lookup map ---
-	type patientDemo struct {
-		sex int
-		yob int
-	}
-	demoMap := map[string]*patientDemo{}
-
-	fmt.Println("Parsing MIMIC-IV patient demographics from: ", patientsFile)
-	pFile, err := os.Open(patientsFile)
-	if err != nil {
-		panic(err)
-	}
-	pReader := csv.NewReader(pFile)
-	// skip header
-	if _, err := pReader.Read(); err != nil {
-		panic(err)
-	}
-	for {
-		record, err := pReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		subjectIDStr := record[0]
-		sex := trajectory.Male
-		if record[1] == "F" {
-			sex = trajectory.Female
-		}
-		anchorAge, _ := strconv.Atoi(record[2])
-		anchorYear, _ := strconv.Atoi(record[3])
-		yob := 0
-		if anchorYear > 0 && anchorAge > 0 {
-			yob = anchorYear - anchorAge
-		}
-		demoMap[subjectIDStr] = &patientDemo{sex: sex, yob: yob}
-	}
-	pFile.Close()
-	fmt.Println("Loaded demographics for ", len(demoMap), " patients.")
-
-	// --- stream hcpcsevents.csv ---
-	fmt.Println("Parsing MIMIC-IV HCPCS events from: ", hcpcsFile)
-	file, err := os.Open(hcpcsFile)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	reader := csv.NewReader(file)
-
-	header, err := reader.Read()
-	if err != nil {
-		panic(fmt.Sprint("failed to read CSV header: ", err))
-	}
-	colSubjectID, colChartDate, colHcpcsCd, colShortDesc := resolveColumns(header)
-
-	patientMap := &trajectory.PatientMap{
-		PIDMap:       map[int]*trajectory.Patient{},
-		PIDStringMap: map[string]int{},
-	}
-
-	hcpcsCodeToDID := map[string]int{}
-	didToName := map[int]string{}
-	didToCode := map[int]string{}
-	didCounter := 0
-	maxYOB := 1850
-	minYOB := 2100
-	eventCtr := 0
-	skippedCtr := 0
-
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		eventCtr++
-
-		subjectIDStr := record[colSubjectID]
-		chartDateStr := record[colChartDate]
-		hcpcsCd := record[colHcpcsCd]
-
-		date, ok := parseMIMIC4Date(chartDateStr)
-		if !ok {
-			skippedCtr++
-			continue
-		}
-
-		// register HCPCS code
-		if _, exists := hcpcsCodeToDID[hcpcsCd]; !exists {
-			hcpcsCodeToDID[hcpcsCd] = didCounter
-			name := hcpcsCd
-			if colShortDesc != -1 && colShortDesc < len(record) && record[colShortDesc] != "" {
-				name = record[colShortDesc]
-			}
-			didToName[didCounter] = name
-			didToCode[didCounter] = hcpcsCd
-			didCounter++
-		}
-
-		// register patient
-		if _, exists := patientMap.PIDStringMap[subjectIDStr]; !exists {
-			patientMap.Ctr++
-			pid := patientMap.Ctr
-
-			sex := trajectory.Male
-			yob := 0
-			if demo, found := demoMap[subjectIDStr]; found {
-				sex = demo.sex
-				yob = demo.yob
-			}
-			if sex == trajectory.Male {
-				patientMap.MaleCtr++
-			} else {
-				patientMap.FemaleCtr++
-			}
-
-			if yob > 0 {
-				maxYOB = utils.MaxInt(yob, maxYOB)
-				minYOB = utils.MinInt(yob, minYOB)
-			}
-
-			patient := &trajectory.Patient{
-				PID:       pid,
-				PIDString: subjectIDStr,
-				YOB:       yob,
-				CohortAge: 0,
-				Sex:       sex,
-				Diagnoses: []*trajectory.Diagnosis{},
-				Region:    0,
-			}
-			patientMap.PIDMap[pid] = patient
-			patientMap.PIDStringMap[subjectIDStr] = pid
-		}
-
-		// append event
-		pid := patientMap.PIDStringMap[subjectIDStr]
-		patient := patientMap.PIDMap[pid]
-		did := hcpcsCodeToDID[hcpcsCd]
-		diagnosis := &trajectory.Diagnosis{PID: pid, DID: did, Date: date}
-		trajectory.AddDiagnosis(patient, diagnosis)
-	}
-
-	fmt.Println("Parsed ", eventCtr, " HCPCS events for ", len(patientMap.PIDMap), " patients.")
-	fmt.Printf("Males: %d, Females: %d\n", patientMap.MaleCtr, patientMap.FemaleCtr)
-	fmt.Println("Unique HCPCS codes: ", didCounter)
-	fmt.Println("Skipped events (bad date): ", skippedCtr)
-	fmt.Println("Year of birth range: ", minYOB, " — ", maxYOB)
-
-	// compute cohort ages from YOB range
-	if nofCohortAges > 1 && maxYOB > minYOB {
-		ageRange := math.Ceil(float64(maxYOB-minYOB) / float64(nofCohortAges))
-		for _, p := range patientMap.PIDMap {
-			if p.YOB > 0 {
-				p.CohortAge = int(math.Floor(float64(p.YOB-minYOB) / ageRange))
-			}
-		}
-	}
-
-	// sort and compact
-	for _, patient := range patientMap.PIDMap {
-		trajectory.SortDiagnoses(patient)
-		trajectory.CompactDiagnoses(patient)
-	}
-
-	// apply filters
-	patients := trajectory.ApplyPatientFilters(filters, patientMap)
-	fmt.Println("After filtering: ", len(patients.PIDMap), " patients remain.")
-
-	// build cohorts and experiment
-	nofDiagnosisCodes := didCounter
-	nofRegions := 1
-	cohorts := trajectory.InitializeCohorts(patients, nofCohortAges, nofRegions, nofDiagnosisCodes)
-	mergedCohort := trajectory.MergeCohorts(cohorts)
-
-	exp := &trajectory.Experiment{
-		NofAgeGroups:      nofCohortAges,
-		NofRegions:        nofRegions,
-		Level:             0,
-		NofDiagnosisCodes: nofDiagnosisCodes,
-		DxDRR:             trajectory.MakeDxDRR(nofDiagnosisCodes),
-		DxDPatients:       trajectory.MakeDxDPatients(nofDiagnosisCodes),
-		DPatients:         mergedCohort.DPatients,
-		Cohorts:           cohorts,
-		Name:              "mimic4_hcpcs",
-		NameMap:           didToName,
-		IdMap:             didToCode,
-		MCtr:              patients.MaleCtr,
-		FCtr:              patients.FemaleCtr,
-	}
-
-	return exp, patients
-}
-
-// ---------------------------------------------------------------------------
-// diagnoses_icd parser — entirely separate from the HCPCS parser
-// ---------------------------------------------------------------------------
-
-// loadAdmissionDates loads admissions.csv and returns a map from hadm_id → DiagnosisDate.
-// The admittime column (format "YYYY-MM-DD HH:MM:SS") is used as the event date.
-func loadAdmissionDates(admissionsFile string) map[string]trajectory.DiagnosisDate {
-	fmt.Println("Loading admission dates from: ", admissionsFile)
-	file, err := os.Open(admissionsFile)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-	header, err := reader.Read()
-	if err != nil {
-		panic(err)
-	}
-	colHadmID, colAdmitTime := -1, -1
-	for i, h := range header {
-		switch strings.TrimSpace(strings.ToLower(h)) {
-		case "hadm_id":
-			colHadmID = i
-		case "admittime":
-			colAdmitTime = i
-		}
-	}
-	if colHadmID == -1 || colAdmitTime == -1 {
-		panic("admissions.csv must contain hadm_id and admittime columns")
-	}
-
-	result := map[string]trajectory.DiagnosisDate{}
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		// admittime format: "2180-05-06 22:23:00" — parse the date portion
-		if len(record[colAdmitTime]) >= 10 {
-			if date, ok := parseMIMIC4Date(record[colAdmitTime][:10]); ok {
-				result[record[colHadmID]] = date
-			}
-		}
-	}
-	fmt.Println("Loaded admission dates for ", len(result), " admissions.")
-	return result
-}
-
-// loadICDNames loads d_icd_diagnoses.csv and returns a map from icd_code → long_title.
-func loadICDNames(file string) map[string]string {
-	fmt.Println("Loading ICD diagnosis names from: ", file)
-	f, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	reader := csv.NewReader(f)
-	header, err := reader.Read()
-	if err != nil {
-		panic(err)
-	}
-	colCode, colTitle := -1, -1
-	for i, h := range header {
-		switch strings.TrimSpace(strings.ToLower(h)) {
-		case "icd_code":
-			colCode = i
-		case "long_title":
-			colTitle = i
-		}
-	}
-	if colCode == -1 || colTitle == -1 {
-		panic("d_icd_diagnoses.csv must contain icd_code and long_title columns")
-	}
-
-	result := map[string]string{}
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		result[record[colCode]] = record[colTitle]
-	}
-	fmt.Println("Loaded names for ", len(result), " ICD codes.")
-	return result
-}
-
-// loadICD9ToICD10 loads a JSON file mapping ICD-9 codes to ICD-10 codes.
-// Format: {"ICD9_CODE": "ICD10_CODE", ...} — same as the TriNetX --ICD9ToICD10File.
-func loadICD9ToICD10(file string) map[string]string {
-	fmt.Println("Loading ICD-9 to ICD-10 mapping from: ", file)
-	jsonFile, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-	defer jsonFile.Close()
-	jsonBytes, _ := ioutil.ReadAll(jsonFile)
-	var mapping map[string]string
-	json.Unmarshal(jsonBytes, &mapping)
-	fmt.Println("Loaded ", len(mapping), " ICD-9 to ICD-10 mappings.")
-	return mapping
-}
-
-// stripDot removes dots from an ICD code. MIMIC-IV stores codes without dots (e.g. "A001")
-// while some mapping files use dotted notation (e.g. "A00.1").
-func stripDot(code string) string {
-	return strings.ReplaceAll(code, ".", "")
-}
-
-// convertICD9ToICD10 attempts to convert an ICD-9 code using the provided mapping.
-// It tries the raw code first, then a dotted variant (dot after 3rd char), since mapping
-// files may use either format. Returns the ICD-10 code (dot-stripped) and true on success.
-func convertICD9ToICD10(icd9Code string, mapping map[string]string) (string, bool) {
-	if icd10, ok := mapping[icd9Code]; ok {
-		return stripDot(icd10), true
-	}
-	if len(icd9Code) > 3 {
-		dotted := icd9Code[:3] + "." + icd9Code[3:]
-		if icd10, ok := mapping[dotted]; ok {
-			return stripDot(icd10), true
-		}
-	}
-	return "", false
-}
-
-// parseDiagnosesICDWithPatients builds a trajectory.Experiment from diagnoses_icd.csv.
-// It loads patient demographics from patients.csv, admission dates from admissions.csv,
-// and human-readable names from d_icd_diagnoses.csv. ICD-9 codes are converted to ICD-10
-// using the provided mapping; rows that cannot be converted are skipped (same as TriNetX).
-//
-// The file is streamed row-by-row so that large files can be processed efficiently.
-func parseDiagnosesICDWithPatients(diagnosesICDFile, patientsFile, admissionsFile,
-	icdNamesFile, icd9ToIcd10File string, nofCohortAges int,
-	filters []trajectory.PatientFilter) (*trajectory.Experiment, *trajectory.PatientMap) {
-
-	// --- load patient demographics ---
-	type patientDemo struct {
-		sex int
-		yob int
-	}
-	demoMap := map[string]*patientDemo{}
-
-	fmt.Println("Parsing MIMIC-IV patient demographics from: ", patientsFile)
-	pFile, err := os.Open(patientsFile)
-	if err != nil {
-		panic(err)
-	}
-	pReader := csv.NewReader(pFile)
-	if _, err := pReader.Read(); err != nil {
-		panic(err)
-	}
-	for {
-		record, err := pReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		subjectIDStr := record[0]
-		sex := trajectory.Male
-		if record[1] == "F" {
-			sex = trajectory.Female
-		}
-		anchorAge, _ := strconv.Atoi(record[2])
-		anchorYear, _ := strconv.Atoi(record[3])
-		yob := 0
-		if anchorYear > 0 && anchorAge > 0 {
-			yob = anchorYear - anchorAge
-		}
-		demoMap[subjectIDStr] = &patientDemo{sex: sex, yob: yob}
-	}
-	pFile.Close()
-	fmt.Println("Loaded demographics for ", len(demoMap), " patients.")
-
-	// --- load auxiliary data ---
-	admissionDates := loadAdmissionDates(admissionsFile)
-	icdNames := loadICDNames(icdNamesFile)
-
-	icd9ToIcd10Map := map[string]string{}
-	if icd9ToIcd10File != "" {
-		icd9ToIcd10Map = loadICD9ToICD10(icd9ToIcd10File)
-	}
-
-	// --- stream diagnoses_icd.csv ---
-	fmt.Println("Parsing MIMIC-IV ICD diagnoses from: ", diagnosesICDFile)
-	file, err := os.Open(diagnosesICDFile)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	reader := csv.NewReader(file)
-	header, err := reader.Read()
-	if err != nil {
-		panic(fmt.Sprint("failed to read diagnoses_icd CSV header: ", err))
-	}
-
-	colSubjectID, colHadmID, colICDCode, colICDVersion := -1, -1, -1, -1
-	for i, h := range header {
-		switch strings.TrimSpace(strings.ToLower(h)) {
-		case "subject_id":
-			colSubjectID = i
-		case "hadm_id":
-			colHadmID = i
-		case "icd_code":
-			colICDCode = i
-		case "icd_version":
-			colICDVersion = i
-		}
-	}
-	if colSubjectID == -1 || colHadmID == -1 || colICDCode == -1 || colICDVersion == -1 {
-		panic("diagnoses_icd.csv must contain subject_id, hadm_id, icd_code, and icd_version columns")
-	}
-
-	patientMap := &trajectory.PatientMap{
-		PIDMap:       map[int]*trajectory.Patient{},
-		PIDStringMap: map[string]int{},
-	}
-
-	codeToDID := map[string]int{}
-	didToName := map[int]string{}
-	didToCode := map[int]string{}
-	didCounter := 0
-	maxYOB := 1850
-	minYOB := 2100
-	eventCtr := 0
-	skippedNoDate := 0
-	skippedNoConvert := 0
-	icd9ConvertedCtr := 0
-	icd10DirectCtr := 0
-
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		eventCtr++
-
-		subjectIDStr := record[colSubjectID]
-		hadmID := record[colHadmID]
-		icdCode := record[colICDCode]
-		icdVersion := record[colICDVersion]
-
-		// look up admission date
-		date, dateOk := admissionDates[hadmID]
-		if !dateOk {
-			skippedNoDate++
-			continue
-		}
-
-		// handle ICD version: convert ICD-9 to ICD-10
-		if icdVersion == "9" {
-			converted, ok := convertICD9ToICD10(icdCode, icd9ToIcd10Map)
-			if !ok {
-				skippedNoConvert++
-				continue
-			}
-			icd9ConvertedCtr++
-			icdCode = converted
-		} else {
-			icd10DirectCtr++
-		}
-
-		// look up human-readable name
-		icdName := icdCode
-		if title, ok := icdNames[icdCode]; ok {
-			icdName = title
-		}
-
-		// register code
-		if _, exists := codeToDID[icdCode]; !exists {
-			codeToDID[icdCode] = didCounter
-			didToName[didCounter] = icdName
-			didToCode[didCounter] = icdCode
-			didCounter++
-		}
-
-		// register patient
-		if _, exists := patientMap.PIDStringMap[subjectIDStr]; !exists {
-			patientMap.Ctr++
-			pid := patientMap.Ctr
-
-			sex := trajectory.Male
-			yob := 0
-			if demo, found := demoMap[subjectIDStr]; found {
-				sex = demo.sex
-				yob = demo.yob
-			}
-			if sex == trajectory.Male {
-				patientMap.MaleCtr++
-			} else {
-				patientMap.FemaleCtr++
-			}
-			if yob > 0 {
-				maxYOB = utils.MaxInt(yob, maxYOB)
-				minYOB = utils.MinInt(yob, minYOB)
-			}
-
-			patient := &trajectory.Patient{
-				PID:       pid,
-				PIDString: subjectIDStr,
-				YOB:       yob,
-				CohortAge: 0,
-				Sex:       sex,
-				Diagnoses: []*trajectory.Diagnosis{},
-				Region:    0,
-			}
-			patientMap.PIDMap[pid] = patient
-			patientMap.PIDStringMap[subjectIDStr] = pid
-		}
-
-		// append diagnosis
-		pid := patientMap.PIDStringMap[subjectIDStr]
-		patient := patientMap.PIDMap[pid]
-		did := codeToDID[icdCode]
-		diagnosis := &trajectory.Diagnosis{PID: pid, DID: did, Date: date}
-		trajectory.AddDiagnosis(patient, diagnosis)
-	}
-
-	fmt.Println("Parsed ", eventCtr, " ICD diagnosis rows for ", len(patientMap.PIDMap), " patients.")
-	fmt.Printf("Males: %d, Females: %d\n", patientMap.MaleCtr, patientMap.FemaleCtr)
-	fmt.Println("ICD-10 direct: ", icd10DirectCtr, ", ICD-9 converted: ", icd9ConvertedCtr)
-	fmt.Println("Unique ICD-10 codes: ", didCounter)
-	fmt.Println("Skipped (no admission date): ", skippedNoDate)
-	fmt.Println("Skipped (ICD-9 not convertible): ", skippedNoConvert)
-	fmt.Println("Year of birth range: ", minYOB, " — ", maxYOB)
-
-	// compute cohort ages
-	if nofCohortAges > 1 && maxYOB > minYOB {
-		ageRange := math.Ceil(float64(maxYOB-minYOB) / float64(nofCohortAges))
-		for _, p := range patientMap.PIDMap {
-			if p.YOB > 0 {
-				p.CohortAge = int(math.Floor(float64(p.YOB-minYOB) / ageRange))
-			}
-		}
-	}
-
-	// sort and compact
-	for _, patient := range patientMap.PIDMap {
-		trajectory.SortDiagnoses(patient)
-		trajectory.CompactDiagnoses(patient)
-	}
-
-	// apply filters
-	patients := trajectory.ApplyPatientFilters(filters, patientMap)
-	fmt.Println("After filtering: ", len(patients.PIDMap), " patients remain.")
-
-	// build cohorts and experiment
-	nofDiagnosisCodes := didCounter
-	nofRegions := 1
-	cohorts := trajectory.InitializeCohorts(patients, nofCohortAges, nofRegions, nofDiagnosisCodes)
-	mergedCohort := trajectory.MergeCohorts(cohorts)
-
-	exp := &trajectory.Experiment{
-		NofAgeGroups:      nofCohortAges,
-		NofRegions:        nofRegions,
-		Level:             0,
-		NofDiagnosisCodes: nofDiagnosisCodes,
-		DxDRR:             trajectory.MakeDxDRR(nofDiagnosisCodes),
-		DxDPatients:       trajectory.MakeDxDPatients(nofDiagnosisCodes),
-		DPatients:         mergedCohort.DPatients,
-		Cohorts:           cohorts,
-		Name:              "mimic4_diagnoses_icd",
-		NameMap:           didToName,
-		IdMap:             didToCode,
-		MCtr:              patients.MaleCtr,
-		FCtr:              patients.FemaleCtr,
-	}
-
-	return exp, patients
-}
-
-// ---------------------------------------------------------------------------
 // main — full pipeline
 // ---------------------------------------------------------------------------
 
@@ -813,6 +171,7 @@ func main() {
 		nrOfThreads          int
 		source               string
 		icd9ToIcd10File      string
+		checkICD9            bool
 	)
 
 	var flags flag.FlagSet
@@ -833,7 +192,8 @@ func main() {
 	flags.StringVar(&clusterGranularities, "clusterGranularities", "40,60,80,100", "MCL granularities (comma-separated).")
 	flags.StringVar(&pfilters, "pfilters", "id", "Patient filters: id,male,female,age70+,age70- (comma-separated).")
 	flags.StringVar(&source, "source", "hcpcs", "Event source: hcpcs or diagnoses_icd.")
-	flags.StringVar(&icd9ToIcd10File, "ICD9ToICD10File", "", "JSON file mapping ICD-9 to ICD-10 codes (for diagnoses_icd source).")
+	flags.StringVar(&icd9ToIcd10File, "ICD9ToICD10File", "", "JSON or CSV file mapping ICD-9 to ICD-10 codes (for diagnoses_icd source).")
+	flags.BoolVar(&checkICD9, "checkICD9", false, "Check ICD-9 conversion coverage against diagnoses_icd.csv and exit.")
 
 	// parse
 	parseFlags(flags, 3, helpText)
@@ -889,6 +249,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// --checkICD9: run coverage check and exit
+	if checkICD9 {
+		dICDFile := filepath.Join(hospDir, "diagnoses_icd.csv")
+		if _, err := os.Stat(dICDFile); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Error: diagnoses_icd.csv not found in %s\n", hospDir)
+			os.Exit(1)
+		}
+		if icd9ToIcd10File == "" {
+			fmt.Fprintf(os.Stderr, "Error: --checkICD9 requires --ICD9ToICD10File\n")
+			os.Exit(1)
+		}
+		app.CheckICD9Coverage(dICDFile, icd9ToIcd10File)
+		return
+	}
+
 	// create output directory
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0700); err != nil {
 		panic(err)
@@ -931,10 +306,10 @@ func main() {
 	var patients *trajectory.PatientMap
 	switch source {
 	case "hcpcs":
-		exp, patients = parseHCPCSEventsWithPatients(hcpcsFile, patientsFile, nofAgeGroups,
+		exp, patients = app.ParseHCPCSEventsWithPatients(hcpcsFile, patientsFile, nofAgeGroups,
 			getPatientFilters(pfilters))
 	case "diagnoses_icd":
-		exp, patients = parseDiagnosesICDWithPatients(diagnosesICDFile, patientsFile,
+		exp, patients = app.ParseDiagnosesICDWithPatients(diagnosesICDFile, patientsFile,
 			admissionsFile, icdNamesFile, icd9ToIcd10File, nofAgeGroups,
 			getPatientFilters(pfilters))
 	}
