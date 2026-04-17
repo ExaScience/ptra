@@ -21,8 +21,6 @@ package trajectory
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/exascience/pargo/parallel"
-	"github.com/valyala/fastrand"
 	"io"
 	"math"
 	"math/rand"
@@ -33,6 +31,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/exascience/pargo/parallel"
+	"github.com/valyala/fastrand"
 )
 
 const (
@@ -394,7 +395,7 @@ func countPatientDiagnosisPair(p *Patient, d1, d2 int, minTime, maxTime float64)
 		}
 	}
 	if d1ok != true {
-		panic(fmt.Sprint("Disease d1: ", d1, " not present in patient when checking for d1->d2"))
+		return 0, -1 // d1 not present in patient's diagnoses; skip gracefully
 	}
 	for i, d := range p.Diagnoses[d1Index+1:] {
 		if d.DID == d2 {
@@ -527,10 +528,10 @@ func InitializeExperimentRelativeRiskRatios(exp *Experiment, minTime, maxTime fl
 // LoadRRMatrix loads an RR matrix from file and stores it in the given experiment. This file was created from a
 // previous run. This can be used instead of initializeRelativeRiskRatiosParallel
 func LoadRRMatrix(exp *Experiment, path string) {
-	//reverse the exp name map
-	nameMapReversed := map[string]int{}
-	for i, name := range exp.NameMap {
-		nameMapReversed[name] = i
+	//reverse the exp id map (ICD code -> DID)
+	idMapReversed := map[string]int{}
+	for i, code := range exp.IdMap {
+		idMapReversed[code] = i
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -551,8 +552,11 @@ func LoadRRMatrix(exp *Experiment, path string) {
 		if err != nil {
 			panic(err)
 		}
-		d1 := nameMapReversed[record[0]]
-		d2 := nameMapReversed[record[1]]
+		d1, ok1 := idMapReversed[record[0]]
+		d2, ok2 := idMapReversed[record[1]]
+		if !ok1 || !ok2 {
+			continue // code from saved file not present in current experiment; skip
+		}
 		RR, err := strconv.ParseFloat(record[2], 64)
 		if err != nil {
 			panic(err)
@@ -566,10 +570,10 @@ func LoadRRMatrix(exp *Experiment, path string) {
 // function side effects the experiment's DxDPatients slice. It uses the pMap to match concrete patient objects with IDs
 // stored in the file to be able to fill the patients for each pair of diagnoses.
 func LoadDxDPatients(exp *Experiment, pMap *PatientMap, path string) {
-	//reverse the exp name map
-	nameMapReversed := map[string]int{}
-	for i, name := range exp.NameMap {
-		nameMapReversed[name] = i
+	//reverse the exp id map (ICD code -> DID)
+	idMapReversed := map[string]int{}
+	for i, code := range exp.IdMap {
+		idMapReversed[code] = i
 	}
 	//init DxDPatients map
 	for i, js := range exp.DxDPatients {
@@ -596,11 +600,17 @@ func LoadDxDPatients(exp *Experiment, pMap *PatientMap, path string) {
 		if err != nil {
 			panic(err)
 		}
-		d1 := nameMapReversed[record[0]]
-		d2 := nameMapReversed[record[1]]
+		d1, ok1 := idMapReversed[record[0]]
+		d2, ok2 := idMapReversed[record[1]]
+		if !ok1 || !ok2 {
+			continue // code from saved file not present in current experiment; skip
+		}
 		pidStrings := strings.Split(record[2], ",")
 		for _, pidString := range pidStrings {
-			pid := pMap.PIDStringMap[pidString]
+			pid, pidOk := pMap.PIDStringMap[pidString]
+			if !pidOk {
+				continue // patient from saved file not present in current patient map; skip
+			}
 			p := pMap.PIDMap[pid]
 			exp.DxDPatients[d1][d2] = append(exp.DxDPatients[d1][d2], p)
 		}
@@ -608,7 +618,7 @@ func LoadDxDPatients(exp *Experiment, pMap *PatientMap, path string) {
 }
 
 // SaveRRMatrix stores the RR matrix calculated for the given experiment. The diagnosis pairs from the matrix are
-// stored line per line as follows: medical name 1, medical name 2, RR.
+// stored line per line as follows: ICD code 1, ICD code 2, RR.
 func SaveRRMatrix(exp *Experiment, path string) {
 	file, err := os.Create(path)
 	if err != nil {
@@ -621,7 +631,7 @@ func SaveRRMatrix(exp *Experiment, path string) {
 	}()
 	for i, js := range exp.DxDRR {
 		for j, RR := range js {
-			fmt.Fprintf(file, "%s\t%s\t%s\n", exp.NameMap[i], exp.NameMap[j],
+			fmt.Fprintf(file, "%s\t%s\t%s\n", exp.IdMap[i], exp.IdMap[j],
 				strconv.FormatFloat(RR, 'E', -1, 64))
 		}
 	}
@@ -648,7 +658,7 @@ func SaveDxDPatients(exp *Experiment, path string) {
 						patients = patients + ","
 					}
 				}
-				fmt.Fprintf(file, "%s\t%s\t%s\n", exp.NameMap[i], exp.NameMap[k], patients)
+				fmt.Fprintf(file, "%s\t%s\t%s\n", exp.IdMap[i], exp.IdMap[k], patients)
 			}
 		}
 	}
@@ -778,8 +788,10 @@ func BuildTrajectories(exp *Experiment, minPatients, maxLength, minLength int, m
 			Patients:       [][]*Patient{exp.DxDPatients[pair.First][pair.Second]},
 			TrajMap:        map[*Patient]int{}}
 		for _, p := range exp.DxDPatients[pair.First][pair.Second] {
-			_, idx := countPatientDiagnosisPair(p, pair.First, pair.Second, minTime, maxTime)
-			t.TrajMap[p] = idx
+			found, idx := countPatientDiagnosisPair(p, pair.First, pair.Second, minTime, maxTime)
+			if found == 1 {
+				t.TrajMap[p] = idx
+			}
 		}
 		stack = append(stack, t)
 	}
